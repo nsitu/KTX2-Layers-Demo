@@ -13,8 +13,8 @@ export async function loadBasisModule() {
         // Choose script depending on threading support
         // Use absolute paths from public directory for Vite compatibility
         const scriptSrc = threadingSupported ?
-            "/basis_encoder_threads.js" :
-            "/basis_encoder.js";
+            "./basis_encoder_threads.js" :
+            "./basis_encoder.js";
 
         const script = document.createElement("script");
         script.src = scriptSrc;
