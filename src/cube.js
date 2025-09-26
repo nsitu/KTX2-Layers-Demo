@@ -39,7 +39,7 @@ function hideLoadingSpinner() {
 
 // Set up KTX2 loader
 const ktx2Loader = new KTX2Loader();
-ktx2Loader.setTranscoderPath('/');
+ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
 
 let treesTexture;
