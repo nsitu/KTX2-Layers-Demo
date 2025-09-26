@@ -12,6 +12,31 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
+// Loading spinner control functions
+function showLoadingSpinner() {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.style.display = 'flex';
+    }
+
+    // Hide the cube while loading
+    if (cube) {
+        cube.visible = false;
+    }
+}
+
+function hideLoadingSpinner() {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+
+    // Show the cube when done loading
+    if (cube) {
+        cube.visible = true;
+    }
+}
+
 // Set up KTX2 loader
 const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('/');
@@ -42,6 +67,9 @@ function updateCubeTexture(texture) {
 
 // Function to load KTX2 from blob/buffer
 function loadKTX2FromBuffer(buffer, callback) {
+    // Show loading spinner
+    showLoadingSpinner();
+
     // Create a blob URL from the buffer
     const blob = new Blob([buffer], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
@@ -49,7 +77,15 @@ function loadKTX2FromBuffer(buffer, callback) {
     ktx2Loader.load(url, (texture) => {
         updateCubeTexture(texture);
         URL.revokeObjectURL(url); // Clean up
+
+        // Hide loading spinner and show cube
+        hideLoadingSpinner();
+
         if (callback) callback(texture);
+    }, undefined, (error) => {
+        // Hide loading spinner on error too
+        hideLoadingSpinner();
+        console.error('Error loading KTX2 texture:', error);
     });
 }
 
@@ -96,4 +132,4 @@ window.addEventListener('resize', () => {
 });
 
 
-export { animate, loadKTX2FromBuffer };
+export { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner };

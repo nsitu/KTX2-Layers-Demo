@@ -1,5 +1,5 @@
 import './style.css'
-import { animate, loadKTX2FromBuffer } from './cube.js'
+import { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner } from './cube.js'
 animate();
 
 
@@ -23,6 +23,9 @@ function handleFileLoad(file) {
     var reader = new FileReader()
     var type = file.name.substring(file.name.lastIndexOf('.') + 1, file.name.length);
     var name = file.name.substring(0, file.name.lastIndexOf('.'));
+
+    // Show loading spinner immediately when file is selected
+    showLoadingSpinner();
 
     reader.readAsArrayBuffer(file);
 
@@ -62,7 +65,8 @@ function handleFileLoad(file) {
             await encodeCurrentImage();
         } catch (error) {
             console.error('Error processing image:', error);
-            // Fall back to encoding without processing
+            // Hide spinner on error and fall back to encoding without processing
+            hideLoadingSpinner();
             await encodeCurrentImage();
         }
     }
@@ -131,6 +135,7 @@ const saveResult = async () => {
 async function encodeCurrentImage() {
     if (!currentImageData) {
         console.log('No image loaded!');
+        hideLoadingSpinner();
         return;
     }
 
@@ -140,7 +145,7 @@ async function encodeCurrentImage() {
         // Encode image to KTX2
         const ktx2Data = await ImageToKtx.encode(currentImageData, currentImageName, currentImageExt);
 
-        // Load the encoded KTX2 data into Three.js cube
+        // Load the encoded KTX2 data into Three.js cube (this will handle hiding the spinner)
         loadKTX2FromBuffer(ktx2Data, (texture) => {
             console.log('KTX2 texture loaded and applied to cube:', {
                 width: texture.image.width,
@@ -152,6 +157,8 @@ async function encodeCurrentImage() {
         console.log('Encoding completed successfully');
     } catch (error) {
         console.error('Error during encoding:', error);
+        // Make sure to hide spinner on encoding error
+        hideLoadingSpinner();
     }
 }
 
