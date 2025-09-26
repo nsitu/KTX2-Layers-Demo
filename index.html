@@ -13,9 +13,40 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Vite App</title>
+
+
+  <!-- Cross-Origin Isolation Service Worker -->
+  <script src="./coi-serviceworker.js"></script>
 </head>
 
 <body>
+
+  <!-- UI Controls -->
+  <div class="ui-panel">
+    <h2
+      class="ui-title"
+      id="titleText"
+    >IMAGE to KTX2</h2>
+    <div class="ui-buttons">
+      <button
+        id="loadBtn"
+        class="ui-button"
+      >LOAD</button>
+      <button
+        id="saveBtn"
+        class="ui-button"
+      >SAVE</button>
+    </div>
+    <p class="ui-drop-text">Drop file anywhere</p>
+  </div>
+
+  <!-- Hidden file input for loading -->
+  <input
+    type="file"
+    id="fileInput"
+    accept="image/*"
+    style="display: none;"
+  >
   <div id="app"> </div>
 
   <script
