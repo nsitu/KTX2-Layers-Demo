@@ -18,7 +18,7 @@ let encodingSettings = {
     rdoQuality: 1,
     rdoEnabled: false,
     srgb: true,
-    mipmaps: true,
+    mipmaps: false,   // true to generate full mipmap chain
     basisTexFormat: 1 // UASTC LDR 4x4
 };
 
@@ -142,7 +142,8 @@ function encodeImageToKtx(data, fileName, extension) {
         }
 
         basisEncoder.setCreateKTX2File(true);
-        basisEncoder.setKTX2UASTCSupercompression(true);
+        // basisEncoder.setKTX2UASTCSupercompression(true);
+        basisEncoder.setKTX2UASTCSupercompression(false);
         basisEncoder.setKTX2SRGBTransferFunc(true); // Always true for LDR
 
         // Only LDR image types supported
