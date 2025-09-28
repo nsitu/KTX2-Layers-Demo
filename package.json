@@ -23,6 +23,7 @@
     "vite": "^7.1.7"
   },
   "dependencies": {
+    "eruda": "^3.4.3",
     "three": "^0.180.0"
   }
 }

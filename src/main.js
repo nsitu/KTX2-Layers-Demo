@@ -1,7 +1,7 @@
 import './style.css';
-import { animate, loadKTX2ArrayFromBuffer, showLoadingSpinner, hideLoadingSpinner } from './cube.js';
+import { animate, loadKTX2ArrayFromSlices, showLoadingSpinner, hideLoadingSpinner } from './cube.js';
 import { loadBasisModule } from './load_basis.js';
-import { ImagesToKtx } from './images_to_ktx.js';
+import { ImageToKtx } from './img_to_ktx.js';
 import { threadingSupported } from './/utils.js';
 
 animate();
@@ -18,11 +18,20 @@ async function runArrayDemo() {
         const responses = await Promise.all(names.map(n => fetch(`./${n}`)));
         const ok = responses.every(r => r.ok);
         if (!ok) throw new Error('Failed to fetch one or more demo images');
-        const bufs = await Promise.all(responses.map(r => r.arrayBuffer()));
-        const layers = bufs.map((data, i) => ({ data, fileName: names[i], extension: names[i].split('.').pop() }));
+        const rawImages = await Promise.all(responses.map(r => r.arrayBuffer()));
 
-        const ktxArray = await ImagesToKtx.encode(layers);
-        loadKTX2ArrayFromBuffer(ktxArray, names.length);
+        // Encode each image to a single-image KTX2 file (one slice per file)
+        const singleKtx2Buffers = [];
+        for (let i = 0; i < rawImages.length; i++) {
+            const data = rawImages[i];
+            const ext = names[i].split('.').pop();
+            const base = names[i];
+            const ktx = await ImageToKtx.encode(data, base, ext);
+            singleKtx2Buffers.push(ktx);
+        }
+
+        // Build a CompressedArrayTexture from the single-image KTX2 slices
+        await loadKTX2ArrayFromSlices(singleKtx2Buffers);
     } catch (err) {
         console.error('Array demo failed:', err);
         hideLoadingSpinner();
