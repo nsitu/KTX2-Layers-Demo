@@ -117,6 +117,9 @@ function animate() {
     cube.rotation.x += 0.01;
     cube.rotation.y += 0.01;
 
+    // If an array material is active, advance layer once per second
+    updateArrayLayerCycling();
+
     // Update controls
     controls.update();
 
@@ -133,3 +136,86 @@ window.addEventListener('resize', () => {
 
 
 export { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner };
+export { loadKTX2ArrayFromBuffer };
+
+// ================= Array texture demo support =================
+
+let arrayMaterial = null;
+let arrayLayerCount = 0;
+let arrayLayer = 0;
+let arrayLastSwitchTime = 0;
+
+// Create a shader material that samples from a sampler2DArray
+function makeArrayMaterial(arrayTex, layers) {
+    arrayLayerCount = layers;
+    arrayLayer = 0;
+    arrayLastSwitchTime = performance.now();
+
+    const mat = new THREE.ShaderMaterial({
+        glslVersion: THREE.GLSL3,
+        uniforms: {
+            uTex: { value: arrayTex },
+            uLayer: { value: 0 }
+        },
+        vertexShader: /* glsl */`
+            out vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: /* glsl */`
+            precision highp float;
+            precision highp sampler2DArray;
+            in vec2 vUv;
+            uniform sampler2DArray uTex;
+            uniform int uLayer;
+            out vec4 outColor;
+            void main() {
+                outColor = textureLod(uTex, vec3(vUv, float(uLayer)), 0.0);
+            }
+        `,
+    });
+    mat.transparent = false;
+    mat.depthWrite = true;
+    return mat;
+}
+
+// Load a KTX2 array texture from bytes and apply shader cycling material
+function loadKTX2ArrayFromBuffer(buffer, layers) {
+    showLoadingSpinner();
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+
+    ktx2Loader.load(url, (texture) => {
+        URL.revokeObjectURL(url);
+
+        // KTX2Loader will create a DataTexture2DArray when the source is an array
+        texture.flipY = false;
+        texture.generateMipmaps = false;
+
+        arrayMaterial = makeArrayMaterial(texture, layers);
+        cube.material = arrayMaterial;
+        cube.material.needsUpdate = true;
+
+        hideLoadingSpinner();
+    }, undefined, (error) => {
+        hideLoadingSpinner();
+        console.error('Error loading KTX2 array texture:', error);
+    });
+}
+
+// Update layer once per second when arrayMaterial is active
+const ONE_SECOND = 1000;
+function updateArrayLayerCycling() {
+    if (!arrayMaterial || arrayLayerCount <= 1) return;
+    const now = performance.now();
+    if (now - arrayLastSwitchTime >= ONE_SECOND) {
+        arrayLayer = (arrayLayer + 1) % arrayLayerCount;
+        arrayMaterial.uniforms.uLayer.value = arrayLayer;
+        arrayLastSwitchTime = now;
+    }
+}
+
+// Inject array layer cycling into the existing animation loop
+// (Call updateArrayLayerCycling() inside the original animate below.)

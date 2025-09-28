@@ -1,5 +1,5 @@
 import './style.css'
-import { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner } from './cube.js'
+import { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner, loadKTX2ArrayFromBuffer } from './cube.js'
 animate();
 
 
@@ -10,6 +10,7 @@ animate();
 import { threadingSupported } from './/utils.js';
 import { ImageToKtx } from './img_to_ktx.js';
 import { loadBasisModule } from './load_basis.js';
+import { ImagesToKtx } from './images_to_ktx.js';
 import { resizeImageToPOT } from './image-resizer.js';
 
 
@@ -180,6 +181,7 @@ function init() {
     // Set up button event listeners
     const loadBtn = document.getElementById('loadBtn');
     const saveBtn = document.getElementById('saveBtn');
+    const demoArrayBtn = document.getElementById('demoArrayBtn');
     const fileInput = document.getElementById('fileInput');
 
     if (loadBtn) {
@@ -191,6 +193,30 @@ function init() {
     if (saveBtn) {
         saveBtn.addEventListener('click', () => {
             saveResult();
+        });
+    }
+
+    if (demoArrayBtn) {
+        demoArrayBtn.addEventListener('click', async () => {
+            try {
+                showLoadingSpinner();
+                // Known demo images in public/
+                const names = ['city.jpg', 'leaves.jpg', 'trees.jpg', 'sunflower.jpg'];
+                const responses = await Promise.all(names.map(n => fetch(`./${n}`)));
+                const ok = responses.every(r => r.ok);
+                if (!ok) throw new Error('Failed to fetch one or more demo images');
+                const bufs = await Promise.all(responses.map(r => r.arrayBuffer()));
+                const layers = bufs.map((data, i) => ({ data, fileName: names[i], extension: names[i].split('.').pop() }));
+
+                // Encode array
+                const ktxArray = await ImagesToKtx.encode(layers);
+
+                // Hand off to Three.js shader-based array renderer
+                loadKTX2ArrayFromBuffer(ktxArray, names.length);
+            } catch (err) {
+                console.error('Demo array failed:', err);
+                hideLoadingSpinner();
+            }
         });
     }
 
