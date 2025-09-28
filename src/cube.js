@@ -42,12 +42,7 @@ const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
 
-let treesTexture;
-// Load default texture
-ktx2Loader.load('trees.ktx2', (texture) => {
-    treesTexture = texture;
-    updateCubeTexture(treesTexture);
-});
+// Default texture load removed for array demo focus
 
 // Function to update cube texture
 function updateCubeTexture(texture) {
