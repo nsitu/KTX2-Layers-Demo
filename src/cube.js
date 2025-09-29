@@ -12,6 +12,71 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
+// Small overlay label to show current array layer
+let layerLabelEl = null;
+function ensureLayerLabel() {
+    if (layerLabelEl) return layerLabelEl;
+    const el = document.createElement('div');
+    el.id = 'layerLabel';
+    el.textContent = '';
+    Object.assign(el.style, {
+        position: 'fixed',
+        left: '8px',
+        bottom: '8px',
+        padding: '4px 8px',
+        background: 'rgba(0,0,0,0.6)',
+        color: '#fff',
+        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        fontSize: '12px',
+        lineHeight: '16px',
+        borderRadius: '4px',
+        zIndex: '9999',
+        pointerEvents: 'none'
+    });
+    document.body.appendChild(el);
+    layerLabelEl = el;
+    return el;
+}
+function setLayerLabel(text) {
+    const el = ensureLayerLabel();
+    el.textContent = text;
+}
+
+// Map THREE format constants to readable names for logging
+function formatToString(fmt) {
+    const T = THREE;
+    switch (fmt) {
+        case T.RGBA_BPTC_Format: return 'BC7 (BPTC RGBA)';
+        case T.RGB_BPTC_SIGNED_Format: return 'BC6H (RGB Signed)';
+        case T.RGB_BPTC_UNSIGNED_Format: return 'BC6H (RGB Unsigned)';
+        case T.RGBA_ETC2_EAC_Format: return 'ETC2 RGBA';
+        case T.RGB_ETC2_Format: return 'ETC2 RGB';
+        case T.RGBA_ASTC_4x4_Format: return 'ASTC 4x4';
+        case T.RGBA_ASTC_5x4_Format: return 'ASTC 5x4';
+        case T.RGBA_ASTC_5x5_Format: return 'ASTC 5x5';
+        case T.RGBA_ASTC_6x5_Format: return 'ASTC 6x5';
+        case T.RGBA_ASTC_6x6_Format: return 'ASTC 6x6';
+        case T.RGBA_ASTC_8x5_Format: return 'ASTC 8x5';
+        case T.RGBA_ASTC_8x6_Format: return 'ASTC 8x6';
+        case T.RGBA_ASTC_8x8_Format: return 'ASTC 8x8';
+        case T.RGBA_ASTC_10x5_Format: return 'ASTC 10x5';
+        case T.RGBA_ASTC_10x6_Format: return 'ASTC 10x6';
+        case T.RGBA_ASTC_10x8_Format: return 'ASTC 10x8';
+        case T.RGBA_ASTC_10x10_Format: return 'ASTC 10x10';
+        case T.RGBA_ASTC_12x10_Format: return 'ASTC 12x10';
+        case T.RGBA_ASTC_12x12_Format: return 'ASTC 12x12';
+        case T.RGBA_S3TC_DXT1_Format: return 'BC1 (DXT1 RGBA)';
+        case T.RGB_S3TC_DXT1_Format: return 'BC1 (DXT1 RGB)';
+        case T.RGBA_S3TC_DXT3_Format: return 'BC2 (DXT3 RGBA)';
+        case T.RGBA_S3TC_DXT5_Format: return 'BC3 (DXT5 RGBA)';
+        case T.RED_RGTC1_Format: return 'RGTC1 (BC4 R)';
+        case T.RED_GREEN_RGTC2_Format: return 'RGTC2 (BC5 RG)';
+        case T.RGBAFormat: return 'RGBA8 (uncompressed)';
+        case T.RGBFormat: return 'RGB8 (uncompressed)';
+        default: return `Unknown (${fmt})`;
+    }
+}
+
 // Loading spinner control functions
 function showLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
@@ -174,6 +239,7 @@ function makeArrayMaterial(arrayTex, layers) {
     });
     mat.transparent = false;
     mat.depthWrite = true;
+    setLayerLabel(`Layer 0 / ${layers}`);
     return mat;
 }
 
@@ -256,6 +322,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
 
         // Sanity check: format, dimensions, mip count must match across slices
         const f = textures[0].format;
+        console.log('[KTX2 slices] GPU-format (first slice):', formatToString(f), `(${f})`);
         const baseW = mipmapsList[0][0].width;
         const baseH = mipmapsList[0][0].height;
         const mipsCount = mipmapsList[0].length;
@@ -352,6 +419,7 @@ function updateArrayLayerCycling() {
         arrayLayer = (arrayLayer + 1) % arrayLayerCount;
         arrayMaterial.uniforms.uLayer.value = arrayLayer;
         arrayLastSwitchTime = now;
+        setLayerLabel(`Layer ${arrayLayer} / ${arrayLayerCount}`);
     }
 }
 
