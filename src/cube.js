@@ -98,7 +98,7 @@ try {
     if (isAndroidUA) {
         ktx2Loader.workerConfig = {
             ...ktx2Loader.workerConfig,
-            astcSupported: false,
+            astcSupported: true, // set to false if things turn pink.
             dxtSupported: false,
             bptcSupported: false,
             pvrtcSupported: false,
