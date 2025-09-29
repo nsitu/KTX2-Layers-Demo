@@ -153,19 +153,7 @@ function loadKTX2FromBuffer(buffer, callback) {
 // Create cube geometry and material (texture will be applied when loaded)
 const geometry = new THREE.BoxGeometry(2, 2, 2);
 
-// Optional: If mirroring still occurs, we can manually adjust UV coordinates
-// This ensures the texture appears correctly oriented on all faces
-const uvAttribute = geometry.attributes.uv;
-for (let i = 0; i < uvAttribute.count; i += 4) {
-    // For each face (4 vertices), we can flip U coordinates if needed
-    // This is commented out by default - uncomment if horizontal mirroring persists
 
-    // uvAttribute.setX(i, 1 - uvAttribute.getX(i));     // Top-left
-    // uvAttribute.setX(i + 1, 1 - uvAttribute.getX(i + 1)); // Top-right  
-    // uvAttribute.setX(i + 2, 1 - uvAttribute.getX(i + 2)); // Bottom-right
-    // uvAttribute.setX(i + 3, 1 - uvAttribute.getX(i + 3)); // Bottom-left
-}
-uvAttribute.needsUpdate = true;
 
 const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Default white color until texture loads
 const cube = new THREE.Mesh(geometry, material);

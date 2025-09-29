@@ -10,7 +10,7 @@ body {
   font-size: 14px;
   color: #fff;
   height: 100vh;
-  background: linear-gradient(#323133, #121113);
+  background: #000;
   overscroll-behavior: none;
 }
 
