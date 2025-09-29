@@ -126,6 +126,22 @@ function hideLoadingSpinner() {
 const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
+// Force ETC2 on Android up-front to avoid ASTC array issues and eliminate the need for a second loader
+try {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const isAndroidUA = /Android/i.test(ua);
+    if (isAndroidUA) {
+        ktx2Loader.workerConfig = {
+            ...ktx2Loader.workerConfig,
+            astcSupported: false,
+            dxtSupported: false,
+            bptcSupported: false,
+            pvrtcSupported: false,
+            etc2Supported: true,
+            etc1Supported: true,
+        };
+    }
+} catch { }
 
 // Default texture load removed for array demo focus
 
@@ -353,36 +369,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
         console.log('[KTX2 slices] GPU-format (first slice):', formatToString(f), `(${f})`);
         // Heuristic: On Android devices, ASTC array uploads can be flaky on some drivers.
         // If ASTC was chosen, try reloading slices with ASTC disabled to prefer ETC2.
-        const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-        const isAndroid = /Android/i.test(ua);
-        if (isAndroid && f === THREE.RGBA_ASTC_4x4_Format) {
-            try {
-                console.log('[KTX2 slices] Re-transcoding to ETC2 for array texture on Android (ASTC detected).');
-                const etcUrls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
-                // Use a dedicated temporary loader to avoid stale worker state
-                const altLoader = new KTX2Loader();
-                altLoader.setTranscoderPath('./');
-                altLoader.detectSupport(renderer);
-                altLoader.workerConfig = {
-                    ...altLoader.workerConfig,
-                    astcSupported: false,
-                    dxtSupported: false,
-                    bptcSupported: false,
-                    pvrtcSupported: false,
-                    etc2Supported: true,
-                    etc1Supported: true,
-                };
-                textures = await Promise.all(etcUrls.map((u) => altLoader.loadAsync(u)));
-                etcUrls.forEach((u) => URL.revokeObjectURL(u));
-                try { altLoader.dispose && altLoader.dispose(); } catch { }
-                f = textures[0].format;
-                console.log('[KTX2 slices] Re-transcoded GPU-format (first slice):', formatToString(f), `(${f})`);
-                // Recompute mipmaps for the re-transcoded textures
-                mipmapsList = extractMipmapsList(textures);
-            } catch (reErr) {
-                console.warn('[KTX2 slices] ETC2 re-transcode attempt failed, continuing with ASTC:', reErr);
-            }
-        }
+        // Note: Android is configured to prefer ETC2 at loader init; no re-transcode here.
         const baseW = mipmapsList[0][0].width;
         const baseH = mipmapsList[0][0].height;
         const mipsCount = mipmapsList[0].length;
