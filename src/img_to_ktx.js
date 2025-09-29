@@ -20,7 +20,7 @@ let encodingSettings = {
     rdoEnabled: false,
     srgb: true,
     mipmaps: true,   // generate full mipmap chain for better minification quality
-    supercompression: true, // enable KTX2 UASTC Zstd supercompression
+    supercompression: false, // Zstd supercompression disabled
     basisTexFormat: 1 // UASTC LDR 4x4
 };
 function configureEncoding(opts = {}) {
@@ -156,10 +156,10 @@ function encodeImageToKtx(data, fileName, extension) {
             return;
         }
 
-    basisEncoder.setCreateKTX2File(true);
-    // Enable/disable Zstd supercompression for smaller .ktx2 files at rest
-    // Note: Ensure zstddec.js/wasm are hosted alongside the transcoder for KTX2Loader.
-    basisEncoder.setKTX2UASTCSupercompression(!!encodingSettings.supercompression);
+        basisEncoder.setCreateKTX2File(true);
+        // Enable/disable Zstd supercompression for smaller .ktx2 files at rest
+        // Note: Ensure zstddec.js/wasm are hosted alongside the transcoder for KTX2Loader.
+        basisEncoder.setKTX2UASTCSupercompression(!!encodingSettings.supercompression);
         basisEncoder.setKTX2SRGBTransferFunc(true); // Always true for LDR
 
         // Only LDR image types supported
@@ -176,10 +176,10 @@ function encodeImageToKtx(data, fileName, extension) {
         basisEncoder.setMipSRGB(encodingSettings.srgb);
         basisEncoder.setRDOUASTC(encodingSettings.rdoEnabled);
         basisEncoder.setRDOUASTCQualityScalar(encodingSettings.rdoQuality);
-    basisEncoder.setMipGen(encodingSettings.mipmaps);
+        basisEncoder.setMipGen(encodingSettings.mipmaps);
         basisEncoder.setPackUASTCFlags(encodingSettings.uastcQuality);
 
-    console.log('Encoding to UASTC LDR 4x4', encodingSettings.mipmaps ? '(with mipmaps)' : '(no mips)', encodingSettings.supercompression ? 'and Zstd supercompression' : 'without supercompression');
+        console.log('Encoding to UASTC LDR 4x4', encodingSettings.mipmaps ? '(with mipmaps)' : '(no mips)', encodingSettings.supercompression ? 'and Zstd supercompression' : 'without supercompression');
 
         const startTime = performance.now();
 

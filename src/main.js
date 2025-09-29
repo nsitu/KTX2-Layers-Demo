@@ -6,25 +6,6 @@ import { threadingSupported } from './/utils.js';
 
 animate();
 
-async function zstdAssetsAvailable() {
-    // Prefer HEAD, fall back to GET if needed
-    const tryUrl = async (url) => {
-        try {
-            let res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-            if (res.ok) return true;
-        } catch {}
-        try {
-            const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-            return res.ok;
-        } catch {
-            return false;
-        }
-    };
-    const jsOk = await tryUrl('./zstddec.js');
-    const wasmOk = await tryUrl('./zstddec.wasm');
-    return jsOk && wasmOk;
-}
-
 async function runArrayDemo() {
     try {
         showLoadingSpinner();
@@ -33,10 +14,9 @@ async function runArrayDemo() {
             titleElement.textContent = 'KTX2 Array Demo' + (threadingSupported ? ' (Threaded)' : '');
         }
 
-        // Configure encoder for mipmaps and supercompression if the decoder assets exist
-        const hasZstd = await zstdAssetsAvailable();
-        ImageToKtx.configure({ mipmaps: true, supercompression: !!hasZstd });
-        console.log('[Encoder config] mipmaps=true, supercompression=', !!hasZstd, hasZstd ? '' : '(zstd assets not found, falling back)');
+        // Configure encoder: mipmaps on, Zstd supercompression disabled
+        ImageToKtx.configure({ mipmaps: true, supercompression: false });
+        console.log('[Encoder config] mipmaps=true, supercompression=false');
 
         const names = ['city.jpg', 'leaves.jpg', 'trees.jpg', 'sunflower.jpg'];
         const responses = await Promise.all(names.map(n => fetch(`./${n}`)));
@@ -44,7 +24,7 @@ async function runArrayDemo() {
         if (!ok) throw new Error('Failed to fetch one or more demo images');
         const rawImages = await Promise.all(responses.map(r => r.arrayBuffer()));
 
-    // Encode each image to a single-image KTX2 file (one slice per file)
+        // Encode each image to a single-image KTX2 file (one slice per file)
         const singleKtx2Buffers = [];
         for (let i = 0; i < rawImages.length; i++) {
             const data = rawImages[i];
