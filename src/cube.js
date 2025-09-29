@@ -291,6 +291,46 @@ function loadKTX2ArrayFromBuffer(buffer, layers) {
 async function loadKTX2ArrayFromSlices(buffers) {
     showLoadingSpinner();
     try {
+        // Helper: extract and validate mipmaps for each texture
+        const extractMipmapsList = (texs) => {
+            const list = texs.map((t, idx) => {
+                let mips = t.mipmaps;
+                if (!Array.isArray(mips) || mips.length === 0) {
+                    const iw = t.image?.width;
+                    const ih = t.image?.height;
+                    const idata = t.image?.data;
+                    if (idata && typeof iw === 'number' && typeof ih === 'number') {
+                        mips = [{ data: idata, width: iw, height: ih }];
+                    } else {
+                        throw new Error(`Slice ${idx}: missing mipmap data`);
+                    }
+                }
+                for (let m = 0; m < mips.length; m++) {
+                    const level = mips[m];
+                    if (!level || !level.data) throw new Error(`Slice ${idx} mip ${m}: missing data`);
+                    const d = level.data;
+                    const isTypedArray = ArrayBuffer.isView(d);
+                    const isArrayOfTyped = Array.isArray(d) && d.every((x) => ArrayBuffer.isView(x));
+                    if (!isTypedArray && !isArrayOfTyped) throw new Error(`Slice ${idx} mip ${m}: data must be typed array(s)`);
+                    if (!(level.width > 0) || !(level.height > 0)) throw new Error(`Slice ${idx} mip ${m}: invalid dimensions ${level.width}x${level.height}`);
+                }
+                return mips;
+            });
+            return list;
+        };
+        // Helper: block sizes for a few common compressed formats
+        const getBlockInfo = (fmt) => {
+            const T = THREE;
+            if (fmt === T.RGBA_ASTC_4x4_Format) return { bw: 4, bh: 4, bpb: 16 };
+            if (fmt === T.RGBA_BPTC_Format) return { bw: 4, bh: 4, bpb: 16 };
+            if (fmt === T.RGBA_S3TC_DXT1_Format || fmt === T.RGB_S3TC_DXT1_Format) return { bw: 4, bh: 4, bpb: 8 };
+            if (fmt === T.RGBA_S3TC_DXT3_Format || fmt === T.RGBA_S3TC_DXT5_Format) return { bw: 4, bh: 4, bpb: 16 };
+            if (fmt === T.RGB_ETC2_Format) return { bw: 4, bh: 4, bpb: 8 };
+            if (fmt === T.RGBA_ETC2_EAC_Format) return { bw: 4, bh: 4, bpb: 16 };
+            // Fallback unknown
+            return null;
+        };
+
         // Create blob URLs and load each slice as a compressed texture
         const urls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
         let textures = await Promise.all(urls.map((u) => ktx2Loader.loadAsync(u)));
@@ -306,39 +346,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
         });
 
         // For each texture, get its mipmaps array; ensure at least base level present
-        const mipmapsList = textures.map((t, idx) => {
-            let mips = t.mipmaps;
-            if (!Array.isArray(mips) || mips.length === 0) {
-                // Some loaders may store base level in .mipmaps even when no extra mips; if not, try to infer
-                const iw = t.image?.width;
-                const ih = t.image?.height;
-                const idata = t.image?.data; // Usually undefined for compressed textures; included for completeness
-                if (idata && typeof iw === 'number' && typeof ih === 'number') {
-                    mips = [{ data: idata, width: iw, height: ih }];
-                } else {
-                    throw new Error(`Slice ${idx}: missing mipmap data`);
-                }
-            }
-            // Validate each mip has ArrayBufferView data
-            for (let m = 0; m < mips.length; m++) {
-                const level = mips[m];
-                if (!level || !level.data) {
-                    throw new Error(`Slice ${idx} mip ${m}: missing data`);
-                }
-                // level.data may be typed array or array-of-typed-arrays
-                const d = level.data;
-                const isTypedArray = ArrayBuffer.isView(d);
-                const isArrayOfTyped = Array.isArray(d) && d.every((x) => ArrayBuffer.isView(x));
-                if (!isTypedArray && !isArrayOfTyped) {
-                    console.error('Bad mip level:', { idx, mip: m, sample: d });
-                    throw new Error(`Slice ${idx} mip ${m}: data must be a typed array or array of typed arrays`);
-                }
-                if (!(level.width > 0) || !(level.height > 0)) {
-                    throw new Error(`Slice ${idx} mip ${m}: invalid dimensions ${level.width}x${level.height}`);
-                }
-            }
-            return mips;
-        });
+        let mipmapsList = extractMipmapsList(textures);
 
         // Sanity check: format, dimensions, mip count must match across slices
         let f = textures[0].format;
@@ -366,8 +374,12 @@ async function loadKTX2ArrayFromSlices(buffers) {
                 };
                 textures = await Promise.all(etcUrls.map((u) => altLoader.loadAsync(u)));
                 etcUrls.forEach((u) => URL.revokeObjectURL(u));
+                // Dispose the temporary loader to avoid multiple active loader warnings
+                try { altLoader.dispose && altLoader.dispose(); } catch { }
                 f = textures[0].format;
                 console.log('[KTX2 slices] Re-transcoded GPU-format (first slice):', formatToString(f), `(${f})`);
+                // Recompute mipmaps for the re-transcoded textures
+                mipmapsList = extractMipmapsList(textures);
             } catch (reErr) {
                 console.warn('[KTX2 slices] ETC2 re-transcode attempt failed, continuing with ASTC:', reErr);
             }
@@ -424,9 +436,37 @@ async function loadKTX2ArrayFromSlices(buffers) {
                 flat.set(new Uint8Array(part.buffer, part.byteOffset, part.byteLength), offset);
                 offset += part.byteLength;
             }
-            // Debug per-level summary
-            console.log(`[KTX2 array build] mip ${level}: ${levelWidth}x${levelHeight}, layers=${levelData.length}, flatBytes=${flat.byteLength}`);
+            // Debug per-level summary, include expected bytes if known
+            const blk = getBlockInfo(f);
+            let expectedBytes = null;
+            if (blk) {
+                const bw = Math.ceil(levelWidth / blk.bw);
+                const bh = Math.ceil(levelHeight / blk.bh);
+                expectedBytes = bw * bh * blk.bpb * depth;
+            }
+            console.log(`[KTX2 array build] mip ${level}: ${levelWidth}x${levelHeight}, layers=${levelData.length}, flatBytes=${flat.byteLength}` + (expectedBytes !== null ? ` (expected≈${expectedBytes})` : ''));
             mipmapsByLevel.push({ data: flat, width: levelWidth, height: levelHeight });
+        }
+
+        // If ETC2 format was selected, double-check whether data matches RGB (8bpb) or RGBA (16bpb)
+        // and correct the format accordingly to avoid GPU interpreting with the wrong internalformat.
+        if (f === THREE.RGB_ETC2_Format || f === THREE.RGBA_ETC2_EAC_Format) {
+            const lvl0 = mipmapsByLevel[0];
+            const blocksW = Math.ceil(lvl0.width / 4);
+            const blocksH = Math.ceil(lvl0.height / 4);
+            const totalBlocks = blocksW * blocksH;
+            const perLayerBytes = lvl0.data.byteLength / mipmapsList.length; // depth
+            const isRGB = perLayerBytes === totalBlocks * 8;
+            const isRGBA = perLayerBytes === totalBlocks * 16;
+            if (isRGB && f !== THREE.RGB_ETC2_Format) {
+                console.warn('[KTX2 array build] Correcting format to ETC2 RGB based on byte size.');
+                f = THREE.RGB_ETC2_Format;
+            } else if (isRGBA && f !== THREE.RGBA_ETC2_EAC_Format) {
+                console.warn('[KTX2 array build] Correcting format to ETC2 RGBA based on byte size.');
+                f = THREE.RGBA_ETC2_EAC_Format;
+            } else if (!isRGB && !isRGBA) {
+                console.warn('[KTX2 array build] ETC2 byte size does not match RGB or RGBA expectations. Proceeding with', formatToString(f));
+            }
         }
 
         // Construct CompressedArrayTexture with mip-major mipmaps
