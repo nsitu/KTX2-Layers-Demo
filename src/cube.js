@@ -359,10 +359,12 @@ async function loadKTX2ArrayFromSlices(buffers) {
             try {
                 console.log('[KTX2 slices] Re-transcoding to ETC2 for array texture on Android (ASTC detected).');
                 const etcUrls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
-                // Reuse existing loader: temporarily force ETC2 and disable ASTC/BC/PVRTC
-                const prevConfig = { ...ktx2Loader.workerConfig };
-                ktx2Loader.workerConfig = {
-                    ...ktx2Loader.workerConfig,
+                // Use a dedicated temporary loader to avoid stale worker state
+                const altLoader = new KTX2Loader();
+                altLoader.setTranscoderPath('./');
+                altLoader.detectSupport(renderer);
+                altLoader.workerConfig = {
+                    ...altLoader.workerConfig,
                     astcSupported: false,
                     dxtSupported: false,
                     bptcSupported: false,
@@ -370,10 +372,9 @@ async function loadKTX2ArrayFromSlices(buffers) {
                     etc2Supported: true,
                     etc1Supported: true,
                 };
-                textures = await Promise.all(etcUrls.map((u) => ktx2Loader.loadAsync(u)));
+                textures = await Promise.all(etcUrls.map((u) => altLoader.loadAsync(u)));
                 etcUrls.forEach((u) => URL.revokeObjectURL(u));
-                // Restore original config
-                ktx2Loader.workerConfig = prevConfig;
+                try { altLoader.dispose && altLoader.dispose(); } catch { }
                 f = textures[0].format;
                 console.log('[KTX2 slices] Re-transcoded GPU-format (first slice):', formatToString(f), `(${f})`);
                 // Recompute mipmaps for the re-transcoded textures
@@ -476,8 +477,13 @@ async function loadKTX2ArrayFromSlices(buffers) {
         texArray.magFilter = THREE.LinearFilter;
         texArray.wrapS = THREE.ClampToEdgeWrapping;
         texArray.wrapT = THREE.ClampToEdgeWrapping;
-        // Mild anisotropy for better quality when minifying (safe even with 1 mip)
-        try { texArray.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); } catch { }
+        // Mild anisotropy for better quality when minifying; avoid on Android to reduce driver variability
+        try {
+            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+            if (!/Android/i.test(ua)) {
+                texArray.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            }
+        } catch { }
         // Try to propagate color space from the first slice (e.g., SRGBColorSpace)
         if (textures[0].colorSpace) {
             texArray.colorSpace = textures[0].colorSpace;
