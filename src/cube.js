@@ -359,12 +359,10 @@ async function loadKTX2ArrayFromSlices(buffers) {
             try {
                 console.log('[KTX2 slices] Re-transcoding to ETC2 for array texture on Android (ASTC detected).');
                 const etcUrls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
-                const altLoader = new KTX2Loader();
-                altLoader.setTranscoderPath('./');
-                altLoader.detectSupport(renderer);
-                // Force ASTC/BC off; prefer ETC2
-                altLoader.workerConfig = {
-                    ...altLoader.workerConfig,
+                // Reuse existing loader: temporarily force ETC2 and disable ASTC/BC/PVRTC
+                const prevConfig = { ...ktx2Loader.workerConfig };
+                ktx2Loader.workerConfig = {
+                    ...ktx2Loader.workerConfig,
                     astcSupported: false,
                     dxtSupported: false,
                     bptcSupported: false,
@@ -372,10 +370,10 @@ async function loadKTX2ArrayFromSlices(buffers) {
                     etc2Supported: true,
                     etc1Supported: true,
                 };
-                textures = await Promise.all(etcUrls.map((u) => altLoader.loadAsync(u)));
+                textures = await Promise.all(etcUrls.map((u) => ktx2Loader.loadAsync(u)));
                 etcUrls.forEach((u) => URL.revokeObjectURL(u));
-                // Dispose the temporary loader to avoid multiple active loader warnings
-                try { altLoader.dispose && altLoader.dispose(); } catch { }
+                // Restore original config
+                ktx2Loader.workerConfig = prevConfig;
                 f = textures[0].format;
                 console.log('[KTX2 slices] Re-transcoded GPU-format (first slice):', formatToString(f), `(${f})`);
                 // Recompute mipmaps for the re-transcoded textures
@@ -478,6 +476,8 @@ async function loadKTX2ArrayFromSlices(buffers) {
         texArray.magFilter = THREE.LinearFilter;
         texArray.wrapS = THREE.ClampToEdgeWrapping;
         texArray.wrapT = THREE.ClampToEdgeWrapping;
+        // Mild anisotropy for better quality when minifying (safe even with 1 mip)
+        try { texArray.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); } catch { }
         // Try to propagate color space from the first slice (e.g., SRGBColorSpace)
         if (textures[0].colorSpace) {
             texArray.colorSpace = textures[0].colorSpace;
@@ -488,6 +488,9 @@ async function loadKTX2ArrayFromSlices(buffers) {
         if (texArray.mipmaps[0] && Array.isArray(texArray.mipmaps[0].data)) {
             console.log('[KTX2 array build] mip0 layer types:', texArray.mipmaps[0].data.map(d => d && d.constructor && d.constructor.name));
         }
+
+        // Free intermediate per-slice textures to save GPU memory
+        try { textures.forEach(t => t && t.dispose && t.dispose()); } catch { }
 
         arrayMaterial = makeArrayMaterial(texArray, depth);
         cube.material = arrayMaterial;
