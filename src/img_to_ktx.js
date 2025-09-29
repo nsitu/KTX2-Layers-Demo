@@ -7,7 +7,8 @@ import { getBasisModule } from './load_basis.js';
 
 export const ImageToKtx = {
     encode: encodeImageToKtx,
-    getBlob: getEncodedBlob
+    getBlob: getEncodedBlob,
+    configure: configureEncoding
 }
 
 
@@ -18,9 +19,23 @@ let encodingSettings = {
     rdoQuality: 1,
     rdoEnabled: false,
     srgb: true,
-    mipmaps: false,   // true to generate full mipmap chain
+    mipmaps: true,   // generate full mipmap chain for better minification quality
+    supercompression: true, // enable KTX2 UASTC Zstd supercompression
     basisTexFormat: 1 // UASTC LDR 4x4
 };
+function configureEncoding(opts = {}) {
+    // Shallow merge allowed options
+    const allowed = [
+        'multithreading', 'uastcQuality', 'rdoQuality', 'rdoEnabled',
+        'srgb', 'mipmaps', 'supercompression', 'basisTexFormat'
+    ];
+    for (const k of allowed) {
+        if (Object.prototype.hasOwnProperty.call(opts, k)) {
+            encodingSettings[k] = opts[k];
+        }
+    }
+}
+
 
 let encodedKTX2File = null;
 
@@ -141,9 +156,10 @@ function encodeImageToKtx(data, fileName, extension) {
             return;
         }
 
-        basisEncoder.setCreateKTX2File(true);
-        // basisEncoder.setKTX2UASTCSupercompression(true);
-        basisEncoder.setKTX2UASTCSupercompression(false);
+    basisEncoder.setCreateKTX2File(true);
+    // Enable/disable Zstd supercompression for smaller .ktx2 files at rest
+    // Note: Ensure zstddec.js/wasm are hosted alongside the transcoder for KTX2Loader.
+    basisEncoder.setKTX2UASTCSupercompression(!!encodingSettings.supercompression);
         basisEncoder.setKTX2SRGBTransferFunc(true); // Always true for LDR
 
         // Only LDR image types supported
@@ -160,10 +176,10 @@ function encodeImageToKtx(data, fileName, extension) {
         basisEncoder.setMipSRGB(encodingSettings.srgb);
         basisEncoder.setRDOUASTC(encodingSettings.rdoEnabled);
         basisEncoder.setRDOUASTCQualityScalar(encodingSettings.rdoQuality);
-        basisEncoder.setMipGen(encodingSettings.mipmaps);
+    basisEncoder.setMipGen(encodingSettings.mipmaps);
         basisEncoder.setPackUASTCFlags(encodingSettings.uastcQuality);
 
-        console.log('Encoding to UASTC LDR 4x4');
+    console.log('Encoding to UASTC LDR 4x4', encodingSettings.mipmaps ? '(with mipmaps)' : '(no mips)', encodingSettings.supercompression ? 'and Zstd supercompression' : 'without supercompression');
 
         const startTime = performance.now();
 
