@@ -1,5 +1,5 @@
 import './style.css';
-import { animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer } from './cube.js';
+import { animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl } from './cube.js';
 import { loadBasisModule } from './load_basis.js';
 import { ImageToKtx } from './img_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
@@ -23,10 +23,18 @@ async function runArrayDemo() {
         const responses = await Promise.all(names.map(n => fetch(`./${n}`)));
         const ok = responses.every(r => r.ok);
         if (!ok) throw new Error('Failed to fetch one or more demo images');
+        const params = new URLSearchParams(window.location.search);
+        // Quick path: test a known KTX2 array file from public for ASTC/ETC2 behavior
+        const sample = (params.get('sample') || '').toLowerCase();
+        if (sample === 'spirited') {
+            // Use the pre-encoded Spirited Away texture array
+            await loadKTX2ArrayFromUrl('./spiritedaway.ktx2');
+            return;
+        }
+
         const rawImages = await Promise.all(responses.map(r => r.arrayBuffer()));
 
         // A/B switch: ?array=ktx2 or ?array=slices (default: slices)
-        const params = new URLSearchParams(window.location.search);
         const mode = (params.get('array') || 'slices').toLowerCase();
         console.log(`[Array Mode] ${mode}`);
 

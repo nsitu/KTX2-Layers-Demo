@@ -219,6 +219,7 @@ window.addEventListener('resize', () => {
 export { animate, loadKTX2FromBuffer };
 export { loadKTX2ArrayFromBuffer };
 export { loadKTX2ArrayFromSlices };
+export { loadKTX2ArrayFromUrl };
 
 // ================= Array texture demo support =================
 
@@ -301,6 +302,40 @@ function loadKTX2ArrayFromBuffer(buffer, layers) {
     }, undefined, (error) => {
         hideLoadingSpinner();
         console.error('Error loading KTX2 array texture:', error);
+    });
+}
+
+// Load a KTX2 array texture directly from a URL and apply shader cycling material
+function loadKTX2ArrayFromUrl(url) {
+    showLoadingSpinner();
+    ktx2Loader.load(url, (texture) => {
+        // KTX2Loader will create a DataTexture2DArray when the source is an array
+        texture.flipY = false;
+        texture.generateMipmaps = false;
+        const hasMips = Array.isArray(texture.mipmaps) ? texture.mipmaps.length > 1 : true;
+        texture.minFilter = hasMips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        try {
+            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+            if (!/Android/i.test(ua)) {
+                texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            }
+        } catch { }
+
+        // Determine depth (layers) from texture.image if available
+        const depth = texture?.image?.depth || 1;
+        console.log('[KTX2 array url] GPU-format:', formatToString(texture.format), `(${texture.format})`, 'layers=', depth, 'mips=', texture.mipmaps?.length ?? 'unknown');
+
+        arrayMaterial = makeArrayMaterial(texture, depth);
+        cube.material = arrayMaterial;
+        cube.material.needsUpdate = true;
+
+        hideLoadingSpinner();
+    }, undefined, (error) => {
+        hideLoadingSpinner();
+        console.error('Error loading KTX2 array texture from URL:', error);
     });
 }
 
