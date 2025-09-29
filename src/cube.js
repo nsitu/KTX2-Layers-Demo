@@ -92,13 +92,14 @@ const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
 // Force ETC2 on Android since ASTC was rendering pink. 
+// NOTE: astc is officially supported but makes the textures pink on Google Pixel (Mali-G710)
 try {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
     const isAndroidUA = /Android/i.test(ua);
     if (isAndroidUA) {
         ktx2Loader.workerConfig = {
             ...ktx2Loader.workerConfig,
-            astcSupported: true, // set to false if things turn pink.
+            astcSupported: false,
             dxtSupported: false,
             bptcSupported: false,
             pvrtcSupported: false,
