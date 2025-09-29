@@ -39,20 +39,6 @@ function ensureLayerLabel() {
     const el = document.createElement('div');
     el.id = 'layerLabel';
     el.textContent = '';
-    Object.assign(el.style, {
-        position: 'fixed',
-        left: '8px',
-        bottom: '8px',
-        padding: '4px 8px',
-        background: 'rgba(0,0,0,0.6)',
-        color: '#fff',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-        fontSize: '12px',
-        lineHeight: '16px',
-        borderRadius: '4px',
-        zIndex: '9999',
-        pointerEvents: 'none'
-    });
     document.body.appendChild(el);
     layerLabelEl = el;
     return el;

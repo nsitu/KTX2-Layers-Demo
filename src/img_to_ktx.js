@@ -1,6 +1,7 @@
 
 import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
+import { sniffImageSize } from './image-utils.js';
 
 // NOTE: Input images are now pre-processed to POT dimensions
 // by the image resizer worker before reaching this module
@@ -54,65 +55,47 @@ function getFileExtension(url) {
     return cleanExtension;
 }
 
-// Calculate appropriate buffer size for KTX2 encoding based on image data
-// Since images are now always square POT dimensions, calculation is simplified
-function calculateKTX2BufferSize(imageData) {
-    // Try to get image dimensions from the PNG data
-    // PNG signature: 89 50 4E 47 0D 0A 1A 0A
-    // IHDR chunk follows at offset 8
-    const dataView = new DataView(imageData);
+// sniffImageSize is imported from image-utils.js
 
-    let size = 1024;  // Default fallback (square)
-
-    try {
-        // Check for PNG signature
-        if (dataView.getUint32(0) === 0x89504E47 && dataView.getUint32(4) === 0x0D0A1A0A) {
-            // PNG format - IHDR chunk starts at offset 16
-            const width = dataView.getUint32(16, false);  // big-endian
-            const height = dataView.getUint32(20, false); // big-endian
-
-            // Should always be square now, but use smaller dimension as safety
-            size = Math.min(width, height);
-        }
-    } catch (e) {
-        console.warn('Could not parse image dimensions, using default size');
+// Calculate appropriate buffer size for KTX2 encoding based on image data (async for metadata)
+async function calculateKTX2BufferSize(imageData, ext) {
+    let width = 1024, height = 1024;
+    const meta = await sniffImageSize(imageData, ext);
+    if (meta && meta.width && meta.height) {
+        width = meta.width; height = meta.height;
     }
 
-    console.log(`Calculating buffer for ${size}x${size} square image`);
+    console.log(`Calculating buffer for ${width}x${height} square image`);
 
-    // Calculate buffer size with safety margins
-    const pixelCount = size * size;
+    // Estimate bytes using block math for UASTC (4x4 blocks, 16 bytes per block) across mips (optional)
+    const blockBytes = 16, blockDim = 4;
+    const blocksW0 = Math.ceil(width / blockDim);
+    const blocksH0 = Math.ceil(height / blockDim);
+    let bytes = blocksW0 * blocksH0 * blockBytes;
+    if (encodingSettings.mipmaps) {
+        let w = width, h = height;
+        while (w > 1 || h > 1) {
+            w = Math.max(1, w >> 1);
+            h = Math.max(1, h >> 1);
+            bytes += Math.ceil(w / blockDim) * Math.ceil(h / blockDim) * blockBytes;
+        }
+    }
+    const safety = 1.25; // overhead and headers
+    const header = 4096;
+    const total = Math.ceil(bytes * safety) + header;
 
-    // UASTC typically compresses to 8 bits per pixel (4:1 compression from 32bpp)
-    // But we need extra space for:
-    // - KTX2 headers and metadata (~1KB)
-    // - Mipmap levels (adds ~33% for full mipmap chain)
-    // - Safety margin for worst-case compression
-
-    const baseSize = pixelCount * 1.0; // 8 bits per pixel in bytes
-    const mipmapMultiplier = encodingSettings.mipmaps ? 1.33 : 1.0;
-    const safetyMultiplier = 1.5; // 50% safety margin
-    const headerSize = 4096; // 4KB for headers and metadata
-
-    const calculatedSize = Math.ceil(baseSize * mipmapMultiplier * safetyMultiplier) + headerSize;
-
-    // Clamp to reasonable bounds based on WASM limitations
-    // Max 2048x2048 square = ~4.2M pixels, realistic compressed size is much smaller
     const minSize = 1024 * 1024; // 1MB
-    const maxSize = 16 * 1024 * 1024; // 16MB (reduced from 64MB due to WASM constraints)
-
-    const finalSize = Math.max(minSize, Math.min(maxSize, calculatedSize));
-
-    console.log(`Buffer size: ${(finalSize / 1024 / 1024).toFixed(1)}MB for ${size}x${size} square image`);
-
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    const finalSize = Math.max(minSize, Math.min(maxSize, total));
+    console.log(`Buffer size: ${(finalSize / 1024 / 1024).toFixed(1)}MB for ${width}x${height} square image`);
     return finalSize;
 }
 
 
 
 
-function encodeImageToKtx(data, fileName, extension) {
-    return new Promise((resolve, reject) => {
+async function encodeImageToKtx(data, fileName, extension) {
+    return new Promise(async (resolve, reject) => {
         if (!data) {
             reject(new Error('No image data provided'));
             return;
@@ -134,7 +117,7 @@ function encodeImageToKtx(data, fileName, extension) {
         console.log("imageFileDataLoaded URI: " + fileName + '.' + cleanExtension);
 
         // Create a destination buffer with dynamic size based on image dimensions
-        const bufferSize = calculateKTX2BufferSize(data);
+        const bufferSize = await calculateKTX2BufferSize(data, cleanExtension);
         var ktx2FileData = new Uint8Array(bufferSize);
 
         // Compress using the BasisEncoder class
