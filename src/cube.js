@@ -91,12 +91,42 @@ function formatToString(fmt) {
 const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
-// Force ETC2 on Android since ASTC was rendering pink. 
-// NOTE: astc is officially supported but makes the textures pink on Google Pixel (Mali-G710)
+// A/B switch for ASTC vs ETC2:
+// - ?force=astc   -> prefer ASTC (disable ETC2)
+// - ?force=etc2   -> prefer ETC2 (disable ASTC)
+// - default (auto): on Android + Mali, prefer ETC2; otherwise leave detected support
+function getQueryParam(name) {
+    try { return new URLSearchParams(window.location.search).get(name) || null; } catch { return null; }
+}
 try {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
     const isAndroidUA = /Android/i.test(ua);
-    if (isAndroidUA) {
+    // Read GPU renderer string if available
+    let rendererStr = 'unknown';
+    try {
+        const gl = renderer.getContext();
+        const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        rendererStr = rendererInfo ? gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL) : 'unknown';
+    } catch { /* ignore */ }
+    const isMali = /Mali/i.test(rendererStr);
+
+    const force = (getQueryParam('force') || '').toLowerCase(); // 'astc' | 'etc2' | ''
+    let policy = 'auto';
+    if (force === 'astc') policy = 'force-astc';
+    else if (force === 'etc2') policy = 'force-etc2';
+    else if (isAndroidUA && isMali) policy = 'android-mali-etc2';
+
+    if (policy === 'force-astc') {
+        ktx2Loader.workerConfig = {
+            ...ktx2Loader.workerConfig,
+            astcSupported: true,
+            dxtSupported: false,
+            bptcSupported: false,
+            pvrtcSupported: false,
+            etc2Supported: false,
+            etc1Supported: false,
+        };
+    } else if (policy === 'force-etc2' || policy === 'android-mali-etc2') {
         ktx2Loader.workerConfig = {
             ...ktx2Loader.workerConfig,
             astcSupported: false,
@@ -107,6 +137,7 @@ try {
             etc1Supported: true,
         };
     }
+    console.log('[KTX2 cfg] policy =', policy, '| Android =', isAndroidUA, '| renderer =', rendererStr);
 } catch { }
 
 // Default texture load removed for array demo focus
