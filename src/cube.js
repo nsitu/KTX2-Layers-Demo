@@ -244,6 +244,22 @@ function loadKTX2ArrayFromBuffer(buffer, layers) {
         // KTX2Loader will create a DataTexture2DArray when the source is an array
         texture.flipY = false;
         texture.generateMipmaps = false;
+        // Align filters/wraps with the slices-built CompressedArrayTexture
+        const hasMips = Array.isArray(texture.mipmaps) ? texture.mipmaps.length > 1 : true;
+        texture.minFilter = hasMips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        // Avoid anisotropy on Android for stability
+        try {
+            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+            if (!/Android/i.test(ua)) {
+                texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+            }
+        } catch { }
+
+        // Diagnostics: log chosen GPU format
+        console.log('[KTX2 array single-file] GPU-format:', formatToString(texture.format), `(${texture.format})`, 'mips=', texture.mipmaps?.length ?? 'unknown');
 
         arrayMaterial = makeArrayMaterial(texture, layers);
         cube.material = arrayMaterial;

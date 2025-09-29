@@ -1,6 +1,6 @@
 import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
-import { sniffImageSize, calculateKTX2ArrayBufferSize, getFileExtension } from './image-utils.js';
+import { calculateKTX2ArrayBufferSize, getFileExtension } from './image-utils.js';
 
 // Multi-image encoder: encodes N input images (identical dimensions) as a KTX2 2D texture array
 // Mirrors the single-image implementation in img_to_ktx.js but sets multiple slices.
@@ -28,10 +28,6 @@ function getEncodedBlob() {
     return new Blob([encodedKTX2File]);
 }
 
-// getFileExtension is imported from image-utils.js
-
-
-// Buffer sizing is imported from image-utils.js
 
 /**
  * Encode multiple LDR images as a KTX2 2D texture array.
