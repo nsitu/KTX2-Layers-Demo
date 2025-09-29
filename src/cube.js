@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
+import { showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 0, 10);
@@ -83,36 +85,13 @@ function formatToString(fmt) {
     }
 }
 
-// Loading spinner control functions
-function showLoadingSpinner() {
-    const spinner = document.getElementById('loadingSpinner');
-    if (spinner) {
-        spinner.style.display = 'flex';
-    }
 
-    // Hide the cube while loading
-    if (cube) {
-        cube.visible = false;
-    }
-}
-
-function hideLoadingSpinner() {
-    const spinner = document.getElementById('loadingSpinner');
-    if (spinner) {
-        spinner.style.display = 'none';
-    }
-
-    // Show the cube when done loading
-    if (cube) {
-        cube.visible = true;
-    }
-}
 
 // Set up KTX2 loader
 const ktx2Loader = new KTX2Loader();
 ktx2Loader.setTranscoderPath('./');
 ktx2Loader.detectSupport(renderer);
-// Force ETC2 on Android up-front to avoid ASTC array issues and eliminate the need for a second loader
+// Force ETC2 on Android since ASTC was rendering pink. 
 try {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
     const isAndroidUA = /Android/i.test(ua);
@@ -217,7 +196,7 @@ window.addEventListener('resize', () => {
 });
 
 
-export { animate, loadKTX2FromBuffer, showLoadingSpinner, hideLoadingSpinner };
+export { animate, loadKTX2FromBuffer };
 export { loadKTX2ArrayFromBuffer };
 export { loadKTX2ArrayFromSlices };
 
@@ -450,7 +429,8 @@ async function loadKTX2ArrayFromSlices(buffers) {
         texArray.magFilter = THREE.LinearFilter;
         texArray.wrapS = THREE.ClampToEdgeWrapping;
         texArray.wrapT = THREE.ClampToEdgeWrapping;
-        // Mild anisotropy for better quality when minifying; avoid on Android to reduce driver variability
+        // Mild anisotropy for better quality when minifying; 
+        // avoid on Android to reduce driver variability
         try {
             const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
             if (!/Android/i.test(ua)) {

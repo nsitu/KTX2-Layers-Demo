@@ -33,7 +33,6 @@ function getFileExtension(ext) {
     return cleanExtension;
 }
 
-// sniffImageSize is imported from image-utils.js
 
 // Calculate a reasonable destination buffer size for a KTX2 texture array
 async function calculateKTX2BufferSizeForLayers(firstImageData, firstExt, layerCount) {

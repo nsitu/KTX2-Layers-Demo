@@ -33,4 +33,29 @@ const getOptimalThreadCount = () => {
 
 const optimalThreadCount = getOptimalThreadCount();
 
-export { threadingSupported, optimalThreadCount };
+// Loading spinner control functions
+function showLoadingSpinner() {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.style.display = 'flex';
+    }
+
+    // Hide the cube while loading
+    if (cube) {
+        cube.visible = false;
+    }
+}
+
+function hideLoadingSpinner() {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+
+    // Show the cube when done loading
+    if (cube) {
+        cube.visible = true;
+    }
+}
+
+export { threadingSupported, optimalThreadCount, showLoadingSpinner, hideLoadingSpinner };

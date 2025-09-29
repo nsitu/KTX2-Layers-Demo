@@ -1,7 +1,7 @@
 
 import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
-import { sniffImageSize } from './image-utils.js';
+import { calculateKTX2BufferSize } from './image-utils.js';
 
 // NOTE: Input images are now pre-processed to POT dimensions
 // by the image resizer worker before reaching this module
@@ -24,6 +24,11 @@ let encodingSettings = {
     supercompression: false, // Zstd supercompression disabled
     basisTexFormat: 1 // UASTC LDR 4x4
 };
+
+// NOTE:  Zstandard supercompression is disabled for simplicity 
+// If you want to enable it you may need zstddec.js/wasm 
+// on the display end, hosted alongside the transcoder for KTX2Loader.
+
 function configureEncoding(opts = {}) {
     // Shallow merge allowed options
     const allowed = [
@@ -57,39 +62,7 @@ function getFileExtension(url) {
 
 // sniffImageSize is imported from image-utils.js
 
-// Calculate appropriate buffer size for KTX2 encoding based on image data (async for metadata)
-async function calculateKTX2BufferSize(imageData, ext) {
-    let width = 1024, height = 1024;
-    const meta = await sniffImageSize(imageData, ext);
-    if (meta && meta.width && meta.height) {
-        width = meta.width; height = meta.height;
-    }
-
-    console.log(`Calculating buffer for ${width}x${height} square image`);
-
-    // Estimate bytes using block math for UASTC (4x4 blocks, 16 bytes per block) across mips (optional)
-    const blockBytes = 16, blockDim = 4;
-    const blocksW0 = Math.ceil(width / blockDim);
-    const blocksH0 = Math.ceil(height / blockDim);
-    let bytes = blocksW0 * blocksH0 * blockBytes;
-    if (encodingSettings.mipmaps) {
-        let w = width, h = height;
-        while (w > 1 || h > 1) {
-            w = Math.max(1, w >> 1);
-            h = Math.max(1, h >> 1);
-            bytes += Math.ceil(w / blockDim) * Math.ceil(h / blockDim) * blockBytes;
-        }
-    }
-    const safety = 1.25; // overhead and headers
-    const header = 4096;
-    const total = Math.ceil(bytes * safety) + header;
-
-    const minSize = 1024 * 1024; // 1MB
-    const maxSize = 16 * 1024 * 1024; // 16MB
-    const finalSize = Math.max(minSize, Math.min(maxSize, total));
-    console.log(`Buffer size: ${(finalSize / 1024 / 1024).toFixed(1)}MB for ${width}x${height} square image`);
-    return finalSize;
-}
+// calculateKTX2BufferSize is now imported from image-utils.js
 
 
 
@@ -138,13 +111,6 @@ async function encodeImageToKtx(data, fileName, extension) {
             reject(new Error(errorMsg));
             return;
         }
-
-        basisEncoder.setCreateKTX2File(true);
-        // Enable/disable Zstd supercompression for smaller .ktx2 files at rest
-        // Note: Ensure zstddec.js/wasm are hosted alongside the transcoder for KTX2Loader.
-        basisEncoder.setKTX2UASTCSupercompression(!!encodingSettings.supercompression);
-        basisEncoder.setKTX2SRGBTransferFunc(true); // Always true for LDR
-
         // Only LDR image types supported
         var img_type = Module.ldr_image_type.cPNGImage.value;
         if (cleanExtension != null) {
@@ -153,7 +119,9 @@ async function encodeImageToKtx(data, fileName, extension) {
         }
         // Settings
         basisEncoder.setSliceSourceImage(0, new Uint8Array(data), 0, 0, img_type);
-
+        basisEncoder.setCreateKTX2File(true);
+        basisEncoder.setKTX2UASTCSupercompression(encodingSettings.supercompression);
+        basisEncoder.setKTX2SRGBTransferFunc(true); // Always true for LDR 
         basisEncoder.setFormatMode(encodingSettings.basisTexFormat);
         basisEncoder.setPerceptual(encodingSettings.srgb);
         basisEncoder.setMipSRGB(encodingSettings.srgb);

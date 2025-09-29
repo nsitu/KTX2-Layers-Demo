@@ -1,8 +1,8 @@
 import './style.css';
-import { animate, loadKTX2ArrayFromSlices, showLoadingSpinner, hideLoadingSpinner } from './cube.js';
+import { animate, loadKTX2ArrayFromSlices } from './cube.js';
 import { loadBasisModule } from './load_basis.js';
 import { ImageToKtx } from './img_to_ktx.js';
-import { threadingSupported } from './/utils.js';
+import { threadingSupported, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 
 animate();
 
