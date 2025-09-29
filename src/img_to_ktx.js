@@ -1,7 +1,7 @@
 
 import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
-import { calculateKTX2BufferSize } from './image-utils.js';
+import { calculateKTX2BufferSize, getFileExtension } from './image-utils.js';
 
 // NOTE: Input images are now pre-processed to POT dimensions
 // by the image resizer worker before reaching this module
@@ -53,12 +53,7 @@ function getEncodedBlob() {
     return new Blob([encodedKTX2File]);
 }
 
-function getFileExtension(url) {
-    const extension = url;
-    // Remove any query parameters or fragments from the extension and convert to lowercase
-    const cleanExtension = extension.split(/[\?#]/)[0].toLowerCase();
-    return cleanExtension;
-}
+// getFileExtension is imported from image-utils.js
 
 // sniffImageSize is imported from image-utils.js
 

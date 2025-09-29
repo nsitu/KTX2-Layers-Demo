@@ -1,6 +1,6 @@
 import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
-import { sniffImageSize } from './image-utils.js';
+import { sniffImageSize, calculateKTX2ArrayBufferSize, getFileExtension } from './image-utils.js';
 
 // Multi-image encoder: encodes N input images (identical dimensions) as a KTX2 2D texture array
 // Mirrors the single-image implementation in img_to_ktx.js but sets multiple slices.
@@ -28,41 +28,10 @@ function getEncodedBlob() {
     return new Blob([encodedKTX2File]);
 }
 
-function getFileExtension(ext) {
-    const cleanExtension = (ext || '').toString().split(/[\?#]/)[0].toLowerCase();
-    return cleanExtension;
-}
+// getFileExtension is imported from image-utils.js
 
 
-// Calculate a reasonable destination buffer size for a KTX2 texture array
-async function calculateKTX2BufferSizeForLayers(firstImageData, firstExt, layerCount) {
-    let width = 1024, height = 1024;
-    const meta = await sniffImageSize(firstImageData, firstExt);
-    if (meta) { width = meta.width; height = meta.height; }
-
-    console.log(`Calculating buffer for ${layerCount} layer(s) of ${width}x${height} squares`);
-
-    // UASTC block-based estimate across mips for all layers
-    const blockBytes = 16, blockDim = 4;
-    let bytesPerLayer = 0;
-    let w = width, h = height;
-    do {
-        bytesPerLayer += Math.ceil(w / blockDim) * Math.ceil(h / blockDim) * blockBytes;
-        w = Math.max(1, w >> 1);
-        h = Math.max(1, h >> 1);
-    } while (encodingSettings.mipmaps && (w > 1 || h > 1));
-
-    const totalBytes = bytesPerLayer * Math.max(1, layerCount);
-    const safety = 1.35; // a bit more for multi-layer
-    const header = 4096;
-    const total = Math.ceil(totalBytes * safety) + header;
-
-    const minSize = 1 * 1024 * 1024;
-    const maxSize = 32 * 1024 * 1024;
-    const finalSize = Math.max(minSize, Math.min(maxSize, total));
-    console.log(`Buffer size: ${(finalSize / 1024 / 1024).toFixed(1)}MB for ${layerCount} layer(s)`);
-    return finalSize;
-}
+// Buffer sizing is imported from image-utils.js
 
 /**
  * Encode multiple LDR images as a KTX2 2D texture array.
@@ -95,7 +64,7 @@ function encodeImagesToKtxArray(layers) {
             initializeBasis();
 
             // Allocate destination buffer (async)
-            calculateKTX2BufferSizeForLayers(normalized[0].data, normalized[0].ext, normalized.length)
+            calculateKTX2ArrayBufferSize(normalized[0].data, normalized[0].ext, normalized.length, { mipmaps: encodingSettings.mipmaps })
                 .then((bufferSize) => {
                     const ktx2FileData = new Uint8Array(bufferSize);
 
