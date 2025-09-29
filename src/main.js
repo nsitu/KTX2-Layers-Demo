@@ -1,5 +1,5 @@
 import './style.css';
-import { animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl } from './cube.js';
+import { animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl, loadOfficialArrayFromUrl } from './cube.js';
 import { loadBasisModule } from './load_basis.js';
 import { ImageToKtx } from './img_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
@@ -28,7 +28,12 @@ async function runArrayDemo() {
         const sample = (params.get('sample') || '').toLowerCase();
         if (sample === 'spirited') {
             // Use the pre-encoded Spirited Away texture array
-            await loadKTX2ArrayFromUrl('./spiritedaway.ktx2');
+            const style = (params.get('style') || '').toLowerCase();
+            if (style === 'official') {
+                await loadOfficialArrayFromUrl('./spiritedaway.ktx2');
+            } else {
+                await loadKTX2ArrayFromUrl('./spiritedaway.ktx2');
+            }
             return;
         }
 
