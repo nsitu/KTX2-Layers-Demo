@@ -12,6 +12,26 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
+// Environment diagnostics
+try {
+    const gl = renderer.getContext();
+    const isWebGL2 = (gl instanceof WebGL2RenderingContext);
+    const extASTC = gl.getExtension('WEBGL_compressed_texture_astc');
+    const extASTCWebkit = gl.getExtension('WEBKIT_WEBGL_compressed_texture_astc');
+    const extETC = gl.getExtension('WEBGL_compressed_texture_etc');
+    const extETC1 = gl.getExtension('WEBGL_compressed_texture_etc1');
+    const extETCvs = gl.getExtension('WEBGL_compressed_texture_etc');
+    const extS3TC = gl.getExtension('WEBGL_compressed_texture_s3tc');
+    const extBPTC = gl.getExtension('EXT_texture_compression_bptc');
+    const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const vendor = rendererInfo ? gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL) : 'unknown';
+    const rendererStr = rendererInfo ? gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL) : 'unknown';
+    console.log('[GL Env] WebGL2:', isWebGL2, 'ASTC ext:', !!(extASTC || extASTCWebkit), 'ETC/ETC1:', !!extETC, !!extETC1, 'S3TC:', !!extS3TC, 'BPTC:', !!extBPTC);
+    console.log('[GL Env] Vendor/Renderer:', vendor, '/', rendererStr);
+} catch (e) {
+    console.log('[GL Env] Diagnostics failed:', e);
+}
+
 // Small overlay label to show current array layer
 let layerLabelEl = null;
 function ensureLayerLabel() {
@@ -233,7 +253,7 @@ function makeArrayMaterial(arrayTex, layers) {
             uniform int uLayer;
             out vec4 outColor;
             void main() {
-                outColor = textureLod(uTex, vec3(vUv, float(uLayer)), 0.0);
+                outColor = texture(uTex, vec3(vUv, float(uLayer)));
             }
         `,
     });
@@ -273,7 +293,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
     try {
         // Create blob URLs and load each slice as a compressed texture
         const urls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
-        const textures = await Promise.all(urls.map((u) => ktx2Loader.loadAsync(u)));
+        let textures = await Promise.all(urls.map((u) => ktx2Loader.loadAsync(u)));
         // Cleanup URLs
         urls.forEach((u) => URL.revokeObjectURL(u));
 
@@ -321,8 +341,37 @@ async function loadKTX2ArrayFromSlices(buffers) {
         });
 
         // Sanity check: format, dimensions, mip count must match across slices
-        const f = textures[0].format;
+        let f = textures[0].format;
         console.log('[KTX2 slices] GPU-format (first slice):', formatToString(f), `(${f})`);
+        // Heuristic: On Android devices, ASTC array uploads can be flaky on some drivers.
+        // If ASTC was chosen, try reloading slices with ASTC disabled to prefer ETC2.
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+        const isAndroid = /Android/i.test(ua);
+        if (isAndroid && f === THREE.RGBA_ASTC_4x4_Format) {
+            try {
+                console.log('[KTX2 slices] Re-transcoding to ETC2 for array texture on Android (ASTC detected).');
+                const etcUrls = buffers.map((buf) => URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' })));
+                const altLoader = new KTX2Loader();
+                altLoader.setTranscoderPath('./');
+                altLoader.detectSupport(renderer);
+                // Force ASTC/BC off; prefer ETC2
+                altLoader.workerConfig = {
+                    ...altLoader.workerConfig,
+                    astcSupported: false,
+                    dxtSupported: false,
+                    bptcSupported: false,
+                    pvrtcSupported: false,
+                    etc2Supported: true,
+                    etc1Supported: true,
+                };
+                textures = await Promise.all(etcUrls.map((u) => altLoader.loadAsync(u)));
+                etcUrls.forEach((u) => URL.revokeObjectURL(u));
+                f = textures[0].format;
+                console.log('[KTX2 slices] Re-transcoded GPU-format (first slice):', formatToString(f), `(${f})`);
+            } catch (reErr) {
+                console.warn('[KTX2 slices] ETC2 re-transcode attempt failed, continuing with ASTC:', reErr);
+            }
+        }
         const baseW = mipmapsList[0][0].width;
         const baseH = mipmapsList[0][0].height;
         const mipsCount = mipmapsList[0].length;
