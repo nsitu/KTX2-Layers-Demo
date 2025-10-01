@@ -4,6 +4,11 @@ import { ImageToKtx } from './img_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
 import { threadingSupported, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 
+// Pre-import both renderer modules to ensure Vite includes them in production build
+// We'll use dynamic imports to actually load them, but this ensures dependencies are bundled
+import * as cubeWebGL from './cube.js';
+import * as cubeWebGPU from './cube-webgpu.js';
+
 // Renderer selection and imports
 let animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl, loadOfficialArrayFromUrl;
 let rendererType = 'webgl'; // default
@@ -28,35 +33,34 @@ async function chooseRenderer() {
 
     console.log('[Renderer] chosen=', rendererType, '| hasWebGPU=', hasWebGPU, '| Android=', isAndroid, '| force=', forceRenderer || 'auto');
 
-    // Dynamic import based on renderer choice
+    // Use pre-imported modules (already loaded above for Vite bundling)
     if (rendererType === 'webgpu') {
         try {
-            const module = await import('./cube-webgpu.js');
-            animate = module.animate;
-            loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
-            loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
-            loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
-            loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
-            await module.initRenderer();
+            console.log('Using WebGPU renderer');
+            animate = cubeWebGPU.animate;
+            loadKTX2ArrayFromSlices = cubeWebGPU.loadKTX2ArrayFromSlices;
+            loadKTX2ArrayFromBuffer = cubeWebGPU.loadKTX2ArrayFromBuffer;
+            loadKTX2ArrayFromUrl = cubeWebGPU.loadKTX2ArrayFromUrl;
+            loadOfficialArrayFromUrl = cubeWebGPU.loadOfficialArrayFromUrl;
+            await cubeWebGPU.initRenderer();
             console.log('[Renderer] WebGPU initialized');
         } catch (error) {
             console.error('[Renderer] WebGPU failed, falling back to WebGL:', error);
             rendererType = 'webgl';
-            const module = await import('./cube.js');
-            animate = module.animate;
-            loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
-            loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
-            loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
-            loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+            animate = cubeWebGL.animate;
+            loadKTX2ArrayFromSlices = cubeWebGL.loadKTX2ArrayFromSlices;
+            loadKTX2ArrayFromBuffer = cubeWebGL.loadKTX2ArrayFromBuffer;
+            loadKTX2ArrayFromUrl = cubeWebGL.loadKTX2ArrayFromUrl;
+            loadOfficialArrayFromUrl = cubeWebGL.loadOfficialArrayFromUrl;
             animate();
         }
     } else {
-        const module = await import('./cube.js');
-        animate = module.animate;
-        loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
-        loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
-        loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
-        loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+        console.log('Using WebGL renderer');
+        animate = cubeWebGL.animate;
+        loadKTX2ArrayFromSlices = cubeWebGL.loadKTX2ArrayFromSlices;
+        loadKTX2ArrayFromBuffer = cubeWebGL.loadKTX2ArrayFromBuffer;
+        loadKTX2ArrayFromUrl = cubeWebGL.loadKTX2ArrayFromUrl;
+        loadOfficialArrayFromUrl = cubeWebGL.loadOfficialArrayFromUrl;
         animate();
     }
 
