@@ -1,19 +1,77 @@
 import './style.css';
-import { animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl, loadOfficialArrayFromUrl } from './cube.js';
 import { loadBasisModule } from './load_basis.js';
 import { ImageToKtx } from './img_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
 import { threadingSupported, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 
-animate();
+// Renderer selection and imports
+let animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl, loadOfficialArrayFromUrl;
+let rendererType = 'webgl'; // default
+
+async function chooseRenderer() {
+    const params = new URLSearchParams(window.location.search);
+    const forceRenderer = (params.get('renderer') || '').toLowerCase();
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const isAndroid = /Android/i.test(ua);
+
+    // Check WebGPU availability
+    const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
+    if (forceRenderer === 'webgpu') {
+        rendererType = 'webgpu';
+    } else if (forceRenderer === 'webgl') {
+        rendererType = 'webgl';
+    } else {
+        // Auto-detect: prefer WebGPU if available (fixes ASTC array issues on Android)
+        rendererType = hasWebGPU ? 'webgpu' : 'webgl';
+    }
+
+    console.log('[Renderer] chosen=', rendererType, '| hasWebGPU=', hasWebGPU, '| Android=', isAndroid, '| force=', forceRenderer || 'auto');
+
+    // Dynamic import based on renderer choice
+    if (rendererType === 'webgpu') {
+        try {
+            const module = await import('./cube-webgpu.js');
+            animate = module.animate;
+            loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
+            loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
+            loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
+            loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+            await module.initRenderer();
+            console.log('[Renderer] WebGPU initialized');
+        } catch (error) {
+            console.error('[Renderer] WebGPU failed, falling back to WebGL:', error);
+            rendererType = 'webgl';
+            const module = await import('./cube.js');
+            animate = module.animate;
+            loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
+            loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
+            loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
+            loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+        }
+    } else {
+        const module = await import('./cube.js');
+        animate = module.animate;
+        loadKTX2ArrayFromSlices = module.loadKTX2ArrayFromSlices;
+        loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
+        loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
+        loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+    }
+
+    // Update title to show renderer type
+    const titleElement = document.getElementById('titleText');
+    if (titleElement) {
+        const threading = threadingSupported ? ' (Threaded)' : '';
+        const renderer = rendererType === 'webgpu' ? ' [WebGPU]' : ' [WebGL]';
+        titleElement.textContent = 'KTX2 Array Demo' + threading + renderer;
+    }
+
+    animate();
+}
 
 async function runArrayDemo() {
     try {
         showLoadingSpinner();
-        const titleElement = document.getElementById('titleText');
-        if (titleElement) {
-            titleElement.textContent = 'KTX2 Array Demo' + (threadingSupported ? ' (Threaded)' : '');
-        }
 
         // Configure encoder(s): mipmaps on, Zstd supercompression disabled
         ImageToKtx.configure({ mipmaps: true, supercompression: false });
@@ -71,6 +129,7 @@ async function runArrayDemo() {
 }
 
 try {
+    await chooseRenderer();
     await loadBasisModule();
     await runArrayDemo();
 } catch (error) {
