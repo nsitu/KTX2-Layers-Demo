@@ -48,6 +48,7 @@ async function chooseRenderer() {
             loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
             loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
             loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+            animate();
         }
     } else {
         const module = await import('./cube.js');
@@ -56,6 +57,7 @@ async function chooseRenderer() {
         loadKTX2ArrayFromBuffer = module.loadKTX2ArrayFromBuffer;
         loadKTX2ArrayFromUrl = module.loadKTX2ArrayFromUrl;
         loadOfficialArrayFromUrl = module.loadOfficialArrayFromUrl;
+        animate();
     }
 
     // Update title to show renderer type
@@ -65,8 +67,6 @@ async function chooseRenderer() {
         const renderer = rendererType === 'webgpu' ? ' [WebGPU]' : ' [WebGL]';
         titleElement.textContent = 'KTX2 Array Demo' + threading + renderer;
     }
-
-    animate();
 }
 
 async function runArrayDemo() {

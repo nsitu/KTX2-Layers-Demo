@@ -25,11 +25,16 @@ async function initRenderer() {
     renderer = new THREE.WebGPURenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setAnimationLoop(animate);
     document.body.appendChild(renderer.domElement);
+
+    // Wait for WebGPU backend to initialize
+    await renderer.init();
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+
+    // Set animation loop after init is complete
+    renderer.setAnimationLoop(animate);
 
     console.log('[WebGPU] Renderer initialized');
 
