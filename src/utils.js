@@ -200,4 +200,212 @@ function hideLoadingSpinner() {
     }
 }
 
-export { threadingSupported, optimalThreadCount, isAndroid, isIOS, isSafari, getSafariIOSDiagnostics, showLoadingSpinner, hideLoadingSpinner, getWasmThreadingDiagnostics };
+// Memory diagnostics and testing functions
+function getMemoryInfo(stage = 'unknown') {
+    const info = {
+        stage,
+        timestamp: Date.now(),
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        hardwareConcurrency: typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 'unknown') : 'unknown',
+        deviceMemory: typeof navigator !== 'undefined' ? (navigator.deviceMemory || 'unknown') : 'unknown',
+        threadingSupported,
+        optimalThreadCount,
+        isIOS: isIOS(),
+        isSafari: isSafari(),
+        isAndroid: isAndroid(),
+        sharedArrayBufferSupported: typeof SharedArrayBuffer !== 'undefined',
+    };
+
+    // Performance memory API (if available - Chrome/Edge mainly)
+    if (typeof performance !== 'undefined' && performance.memory) {
+        info.performanceMemory = {
+            usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+            totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+            jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB'
+        };
+    }
+
+    return info;
+}
+
+function logMemoryInfo(stage) {
+    const info = getMemoryInfo(stage);
+    console.log(`[Memory Info - ${stage}]:`, info);
+    return info;
+}
+
+function checkPrivateBrowsingMode() {
+    let isPrivate = false;
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('__test_private', 'test');
+            localStorage.removeItem('__test_private');
+        }
+    } catch (e) {
+        isPrivate = true;
+    }
+    return isPrivate;
+}
+
+function estimateAvailableMemory() {
+    const deviceIsIOS = isIOS();
+    const deviceIsSafari = isSafari();
+    const deviceIsAndroid = isAndroid();
+    const isPrivateMode = checkPrivateBrowsingMode();
+
+    let estimatedMB = 300; // Default assumption
+
+    if (deviceIsIOS || deviceIsSafari) {
+        // Conservative estimates for iOS/Safari based on device memory
+        const deviceMemory = typeof navigator !== 'undefined' ? (navigator.deviceMemory || 2) : 2; // Assume 2GB if unknown
+
+        if (isPrivateMode) {
+            estimatedMB = Math.min(50, deviceMemory * 25); // Very limited in private mode
+        } else if (deviceMemory <= 1) {
+            estimatedMB = 100; // 1GB devices
+        } else if (deviceMemory <= 2) {
+            estimatedMB = 200; // 2GB devices  
+        } else if (deviceMemory <= 4) {
+            estimatedMB = 400; // 4GB devices
+        } else {
+            estimatedMB = 500; // 4GB+ devices
+        }
+    } else if (deviceIsAndroid) {
+        // Android typically has better memory management
+        const deviceMemory = typeof navigator !== 'undefined' ? (navigator.deviceMemory || 4) : 4;
+        estimatedMB = Math.min(800, deviceMemory * 200);
+    } else {
+        // Desktop browsers - use performance.memory if available
+        if (typeof performance !== 'undefined' && performance.memory) {
+            const available = (performance.memory.jsHeapSizeLimit - performance.memory.usedJSHeapSize) / 1024 / 1024;
+            estimatedMB = Math.max(200, available * 0.7); // Conservative estimate
+        } else {
+            estimatedMB = 600; // Desktop default assumption
+        }
+    }
+
+    return Math.round(estimatedMB);
+}
+
+function getMemoryConstraints() {
+    const constraints = {
+        isIOS: isIOS(),
+        isSafari: isSafari(),
+        isAndroid: isAndroid(),
+        isPrivateMode: checkPrivateBrowsingMode(),
+        deviceMemory: typeof navigator !== 'undefined' ? (navigator.deviceMemory || 'unknown') : 'unknown',
+        estimatedAvailable: estimateAvailableMemory(),
+        recommendThreaded: false,
+        recommendedInitialMemory: null
+    };
+
+    // Determine threading recommendation based on constraints
+    constraints.recommendThreaded = threadingSupported &&
+        !constraints.isIOS &&
+        !constraints.isPrivateMode &&
+        constraints.estimatedAvailable > 300;
+
+    // Recommend initial memory size for WebAssembly modules
+    if (constraints.isIOS || constraints.isSafari) {
+        if (constraints.estimatedAvailable < 150) {
+            constraints.recommendedInitialMemory = 64 * 1024 * 1024; // 64MB
+        } else if (constraints.estimatedAvailable < 300) {
+            constraints.recommendedInitialMemory = 128 * 1024 * 1024; // 128MB
+        } else {
+            constraints.recommendedInitialMemory = 256 * 1024 * 1024; // 256MB
+        }
+    } else {
+        // Desktop/Android can typically handle more
+        constraints.recommendedInitialMemory = 512 * 1024 * 1024; // 512MB
+    }
+
+    return constraints;
+}
+
+// Test memory allocation capability (useful for debugging OOM errors)
+async function testMemoryAllocation(sizeInMB = 100) {
+    const testResults = {
+        requestedMB: sizeInMB,
+        success: false,
+        actualAllocatedMB: 0,
+        error: null,
+        timeMs: 0
+    };
+
+    const startTime = performance.now();
+
+    try {
+        // Test allocation using ArrayBuffer (similar to WebAssembly memory)
+        const bytes = sizeInMB * 1024 * 1024;
+        const buffer = new ArrayBuffer(bytes);
+
+        // Verify allocation by writing to it
+        const view = new Uint8Array(buffer);
+        view[0] = 1;
+        view[bytes - 1] = 1;
+
+        testResults.success = true;
+        testResults.actualAllocatedMB = sizeInMB;
+
+        // Clean up
+        // Note: We can't explicitly free ArrayBuffer, but setting to null helps GC
+        view[0] = 0;
+        view[bytes - 1] = 0;
+
+    } catch (error) {
+        testResults.error = error.message;
+        console.warn(`[Memory Test] Failed to allocate ${sizeInMB}MB:`, error.message);
+    }
+
+    testResults.timeMs = Math.round(performance.now() - startTime);
+
+    return testResults;
+}
+
+// Find maximum allocatable memory through binary search
+async function findMaxAllocatableMemory(maxTestMB = 1024, minTestMB = 32) {
+    console.log(`[Memory Test] Finding maximum allocatable memory between ${minTestMB}MB and ${maxTestMB}MB...`);
+
+    let low = minTestMB;
+    let high = maxTestMB;
+    let maxSuccessful = 0;
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const result = await testMemoryAllocation(mid);
+
+        if (result.success) {
+            maxSuccessful = mid;
+            low = mid + 1;
+            console.log(`[Memory Test] ✅ ${mid}MB allocation successful`);
+        } else {
+            high = mid - 1;
+            console.log(`[Memory Test] ❌ ${mid}MB allocation failed: ${result.error}`);
+        }
+
+        // Small delay to avoid overwhelming the browser
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    console.log(`[Memory Test] Maximum allocatable memory: ${maxSuccessful}MB`);
+    return maxSuccessful;
+}
+
+export {
+    threadingSupported,
+    optimalThreadCount,
+    isAndroid,
+    isIOS,
+    isSafari,
+    getSafariIOSDiagnostics,
+    showLoadingSpinner,
+    hideLoadingSpinner,
+    getWasmThreadingDiagnostics,
+    getMemoryInfo,
+    logMemoryInfo,
+    checkPrivateBrowsingMode,
+    estimateAvailableMemory,
+    getMemoryConstraints,
+    testMemoryAllocation,
+    findMaxAllocatableMemory
+};
