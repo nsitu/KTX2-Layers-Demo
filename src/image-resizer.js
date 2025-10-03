@@ -12,7 +12,7 @@ const pendingTasks = new Map();
 function initWorker() {
     if (worker) return worker;
 
-    worker = new Worker(new URL('./workers/resize-worker.js', import.meta.url));
+    worker = new Worker(new URL('./resize-worker.js', import.meta.url));
 
     worker.onmessage = function (e) {
         const { taskId, success, error, ...result } = e.data;
