@@ -125,63 +125,9 @@ async function runArrayDemo() {
 }
 
 try {
-    // Safari/iOS: Add enhanced error handling
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-
-    if (isIOS || isSafari) {
-        console.log('[Main] Detected Safari/iOS - initializing with enhanced error handling');
-        console.log('[Main] Threading supported:', threadingSupported);
-        console.log('[Main] Cross-origin isolated:', window.crossOriginIsolated);
-        console.log('[Main] Secure context:', window.isSecureContext);
-    }
-
     await chooseRenderer();
     await loadBasisModule();
     await runArrayDemo();
 } catch (error) {
     console.error('Failed to initialize application:', error);
-
-    // Safari/iOS: Provide detailed error information
-    if (isIOS || isSafari) {
-        console.error('[Main] Safari/iOS Error Details:', {
-            error: error.message,
-            stack: error.stack,
-            userAgent: navigator.userAgent,
-            threadingSupported,
-            crossOriginIsolated: window.crossOriginIsolated,
-            isSecureContext: window.isSecureContext,
-            serviceWorkerController: navigator.serviceWorker?.controller ? 'present' : 'absent'
-        });
-
-        // Show user-friendly error message
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.9); 
-            color: white; 
-            padding: 20px; 
-            border-radius: 10px; 
-            z-index: 10000;
-            max-width: 80%;
-            text-align: center;
-        `;
-        errorDiv.innerHTML = `
-            <h3>Safari/iOS Compatibility Issue</h3>
-            <p>The app encountered an error on Safari/iOS. This may be due to:</p>
-            <ul style="text-align: left;">
-                <li>Service Worker limitations on iOS Safari</li>
-                <li>Cross-origin isolation requirements</li>
-                <li>WebAssembly threading restrictions</li>
-            </ul>
-            <p><small>Check the browser console for detailed error information.</small></p>
-            <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 10px;">Reload Page</button>
-        `;
-        document.body.appendChild(errorDiv);
-    }
-
-    hideLoadingSpinner();
 }
