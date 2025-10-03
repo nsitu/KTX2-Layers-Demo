@@ -75,6 +75,104 @@ function isAndroid() {
     return /Android/i.test(ua);
 }
 
+// Safari/iOS detection utilities
+function isIOS() {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    return /iPad|iPhone|iPod/.test(ua);
+}
+
+function isSafari() {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    return /Safari/.test(ua) && !/Chrome/.test(ua);
+}
+
+// Safari/iOS specific diagnostics
+function getSafariIOSDiagnostics() {
+    const isIOSDevice = isIOS();
+    const isSafariBrowser = isSafari();
+    const hasServiceWorker = 'serviceWorker' in navigator;
+    const hasController = navigator.serviceWorker?.controller ? true : false;
+    const isSecure = window.isSecureContext;
+    const isCrossOriginIsolated = window.crossOriginIsolated;
+
+    return {
+        isIOS: isIOSDevice,
+        isSafari: isSafariBrowser,
+        hasServiceWorker,
+        hasController,
+        isSecureContext: isSecure,
+        crossOriginIsolated: isCrossOriginIsolated,
+        userAgent: navigator.userAgent,
+        // Safari/iOS specific capabilities
+        hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+        hasWebAssembly: typeof WebAssembly !== 'undefined',
+        hasWebWorker: typeof Worker !== 'undefined',
+        threadingDiagnostics: getWasmThreadingDiagnostics()
+    };
+}
+
+// Safari/iOS specific error handler for common issues
+function handleSafariIOSErrors() {
+    if (!isIOS() && !isSafari()) return;
+
+    // Listen for unhandled promise rejections (common with service workers on Safari/iOS)
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('[Safari/iOS] Unhandled Promise Rejection:', event.reason);
+
+        // Check if it's a service worker related error
+        if (event.reason && typeof event.reason === 'object') {
+            const reason = event.reason.toString ? event.reason.toString() : JSON.stringify(event.reason);
+            if (reason.includes('respondWith') || reason.includes('FetchEvent') || reason.includes('serviceworker')) {
+                console.error('[Safari/iOS] Service Worker Error Detected:', reason);
+
+                // Attempt to recover by unregistering and reregistering service worker
+                if (navigator.serviceWorker) {
+                    navigator.serviceWorker.getRegistrations().then((registrations) => {
+                        registrations.forEach((registration) => {
+                            console.log('[Safari/iOS] Attempting to recover service worker registration');
+                            registration.unregister().then(() => {
+                                setTimeout(() => {
+                                    location.reload();
+                                }, 1000);
+                            });
+                        });
+                    });
+                }
+            }
+        }
+    });
+
+    // Listen for general errors
+    window.addEventListener('error', (event) => {
+        console.error('[Safari/iOS] Global Error:', {
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            error: event.error
+        });
+    });
+
+    console.log('[Safari/iOS] Error handlers initialized');
+}
+
+// Initialize Safari/iOS error handling
+if (isIOS() || isSafari()) {
+    handleSafariIOSErrors();
+
+    // Log Safari/iOS diagnostics if detected
+    console.group('[Safari/iOS] Compatibility Diagnostics');
+    const diagnostics = getSafariIOSDiagnostics();
+    Object.entries(diagnostics).forEach(([key, value]) => {
+        if (typeof value === 'object') {
+            console.log(`${key}:`, value);
+        } else {
+            console.log(`${key}: ${value}`);
+        }
+    });
+    console.groupEnd();
+}
+
 // Loading spinner control functions
 function showLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
@@ -102,4 +200,4 @@ function hideLoadingSpinner() {
     }
 }
 
-export { threadingSupported, optimalThreadCount, isAndroid, showLoadingSpinner, hideLoadingSpinner, getWasmThreadingDiagnostics };
+export { threadingSupported, optimalThreadCount, isAndroid, isIOS, isSafari, getSafariIOSDiagnostics, showLoadingSpinner, hideLoadingSpinner, getWasmThreadingDiagnostics };
