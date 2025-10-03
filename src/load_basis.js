@@ -34,6 +34,7 @@ export async function loadBasisModule() {
                 });
 
                 if (module.initializeBasis) {
+                    console.log("Calling module.initializeBasis()...");
                     module.initializeBasis();
                     console.log("module.initializeBasis() called successfully.");
                     basisModule = module;
