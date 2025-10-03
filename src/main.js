@@ -1,16 +1,16 @@
 import './style.css';
 import { loadBasisModule } from './load_basis.js';
-import { ImageToKtx } from './img_to_ktx.js';
+import { ImageToKtx } from './image_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
 import { threadingSupported, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 
 // Pre-import both renderer modules to ensure Vite includes them in production build
 // We'll use dynamic imports to actually load them, but this ensures dependencies are bundled
-import * as cubeWebGL from './cube.js';
-import * as cubeWebGPU from './cube-webgpu.js';
+import * as cubeWebGL from './renderer-webgl.js';
+import * as cubeWebGPU from './renderer-webgpu.js';
 
 // Renderer selection and imports
-let animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl, loadOfficialArrayFromUrl;
+let animate, loadKTX2ArrayFromSlices, loadKTX2ArrayFromBuffer, loadKTX2ArrayFromUrl;
 let rendererType = 'webgl'; // default
 
 async function chooseRenderer() {
@@ -41,7 +41,6 @@ async function chooseRenderer() {
             loadKTX2ArrayFromSlices = cubeWebGPU.loadKTX2ArrayFromSlices;
             loadKTX2ArrayFromBuffer = cubeWebGPU.loadKTX2ArrayFromBuffer;
             loadKTX2ArrayFromUrl = cubeWebGPU.loadKTX2ArrayFromUrl;
-            loadOfficialArrayFromUrl = cubeWebGPU.loadOfficialArrayFromUrl;
             await cubeWebGPU.initRenderer();
             console.log('[Renderer] WebGPU initialized');
         } catch (error) {
@@ -51,7 +50,6 @@ async function chooseRenderer() {
             loadKTX2ArrayFromSlices = cubeWebGL.loadKTX2ArrayFromSlices;
             loadKTX2ArrayFromBuffer = cubeWebGL.loadKTX2ArrayFromBuffer;
             loadKTX2ArrayFromUrl = cubeWebGL.loadKTX2ArrayFromUrl;
-            loadOfficialArrayFromUrl = cubeWebGL.loadOfficialArrayFromUrl;
             animate();
         }
     } else {
@@ -60,7 +58,6 @@ async function chooseRenderer() {
         loadKTX2ArrayFromSlices = cubeWebGL.loadKTX2ArrayFromSlices;
         loadKTX2ArrayFromBuffer = cubeWebGL.loadKTX2ArrayFromBuffer;
         loadKTX2ArrayFromUrl = cubeWebGL.loadKTX2ArrayFromUrl;
-        loadOfficialArrayFromUrl = cubeWebGL.loadOfficialArrayFromUrl;
         animate();
     }
 
@@ -90,16 +87,12 @@ async function runArrayDemo() {
         const sample = (params.get('sample') || '').toLowerCase();
         if (sample === 'spirited') {
             // Use the pre-encoded Spirited Away texture array
-            const style = (params.get('style') || '').toLowerCase();
-            if (style === 'official') {
-                await loadOfficialArrayFromUrl('./spiritedaway.ktx2');
-            } else {
-                await loadKTX2ArrayFromUrl('./spiritedaway.ktx2');
-            }
+            await loadKTX2ArrayFromUrl('./spiritedaway.ktx2');
             return;
         }
 
         const rawImages = await Promise.all(responses.map(r => r.arrayBuffer()));
+
 
         // A/B switch: ?array=ktx2 or ?array=slices (default: slices)
         const mode = (params.get('array') || 'slices').toLowerCase();

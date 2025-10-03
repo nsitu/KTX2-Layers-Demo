@@ -17,6 +17,8 @@ function extToMime(ext) {
 }
 
 // Prefer WebCodecs ImageDecoder; fallback to createImageBitmap; else null
+// NOTE: if we are building images more deliberately with canvas, 
+// this will probably not be needed.
 export async function sniffImageSize(imageData, ext) {
     const mime = extToMime(ext);
     const u8 = imageData instanceof Uint8Array

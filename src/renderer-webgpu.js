@@ -110,8 +110,6 @@ function animate() {
 
     // If an array material is active, advance layer once per second
     updateArrayLayerCycling();
-    // If the official-style plane demo is active, advance its depth
-    updateOfficialDepthCycling();
 
     // Update controls
     if (controls) controls.update();
@@ -429,70 +427,7 @@ function updateArrayLayerCycling() {
     }
 }
 
-// ================= Official-style plane demo =================
-let officialMesh = null;
-let officialMat = null;
-let officialLastTime = 0;
-let officialDepth = 0;
-
-function updateOfficialDepthCycling() {
-    if (!officialMat || !officialMesh) return;
-    const now = performance.now();
-    if (!officialLastTime) officialLastTime = now;
-    const delta = (now - officialLastTime) / 1000;
-    officialLastTime = now;
-    officialDepth += delta * 10.0;
-    const layers = officialMat.userData?.depthMax || 5;
-    const value = Math.floor(officialDepth % layers);
-    if (officialMat.userData && officialMat.userData.depthUniform) {
-        officialMat.userData.depthUniform.value = value;
-    }
-}
-
-async function loadOfficialArrayFromUrl(url) {
-    showLoadingSpinner();
-    await initRenderer();
-    await ktx2Loader.detectSupportAsync(renderer);
-
-    cube.visible = false;
-    if (officialMesh) {
-        try { scene.remove(officialMesh); officialMesh.geometry.dispose(); officialMesh.material.dispose(); } catch { }
-        officialMesh = null;
-        officialMat = null;
-    }
-
-    ktx2Loader.load(url, (texturearray) => {
-        const depth = texturearray?.image?.depth || 1;
-        console.log('[WebGPU Official-style] GPU-format:', formatToString(texturearray.format), `(${texturearray.format})`, 'layers=', depth, 'mips=', texturearray.mipmaps?.length ?? 'unknown');
-
-        const planeWidth = 5.0;
-        const planeHeight = 2.5;
-
-        // Create TSL-based material for WebGPU (matching the official example)
-        const depthUniform = uniform(0);
-
-        const material = new THREE.NodeMaterial();
-        material.colorNode = texture(texturearray, uv().flipY()).depth(depthUniform);
-
-        officialMat = material;
-        officialMat.userData.depthUniform = depthUniform;
-        officialMat.userData.depthMax = depth;
-        officialDepth = 0;
-        officialLastTime = performance.now();
-
-        const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-        officialMesh = new THREE.Mesh(geometry, material);
-        scene.add(officialMesh);
-
-        hideLoadingSpinner();
-    }, undefined, (error) => {
-        hideLoadingSpinner();
-        console.error('Error loading official-style KTX2 array:', error);
-    });
-}
-
 export { initRenderer, animate };
 export { loadKTX2ArrayFromBuffer };
 export { loadKTX2ArrayFromSlices };
 export { loadKTX2ArrayFromUrl };
-export { loadOfficialArrayFromUrl };

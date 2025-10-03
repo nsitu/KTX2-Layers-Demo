@@ -1,5 +1,9 @@
 // Image resizer using Web Worker with OffscreenCanvas
-// Provides a clean Promise-based API for resizing images to POT dimensions
+// Provides a clean Promise-based API for resizing images 
+// to Power of Two (POT) dimensions
+
+// NOTE: we probably don't need to support cropping to square anymore,
+//  we could keep  the feature around in case we need it. 
 
 let worker = null;
 let taskCounter = 0;
@@ -8,7 +12,7 @@ const pendingTasks = new Map();
 function initWorker() {
     if (worker) return worker;
 
-    worker = new Worker(new URL('./resize-worker.js', import.meta.url));
+    worker = new Worker(new URL('./workers/resize-worker.js', import.meta.url));
 
     worker.onmessage = function (e) {
         const { taskId, success, error, ...result } = e.data;

@@ -200,8 +200,6 @@ function animate() {
 
     // If an array material is active, advance layer once per second
     updateArrayLayerCycling();
-    // If the official-style plane demo is active, advance its depth
-    updateOfficialDepthCycling();
 
     // Update controls
     controls.update();
@@ -222,7 +220,6 @@ export { animate, loadKTX2FromBuffer };
 export { loadKTX2ArrayFromBuffer };
 export { loadKTX2ArrayFromSlices };
 export { loadKTX2ArrayFromUrl };
-export { loadOfficialArrayFromUrl };
 
 // ================= Array texture demo support =================
 
@@ -552,101 +549,3 @@ function updateArrayLayerCycling() {
 
 // Inject array layer cycling into the existing animation loop
 // (Call updateArrayLayerCycling() inside the original animate below.)
-
-// ================= Official-style plane demo =================
-let officialMesh = null;
-let officialMat = null;
-let officialLastTime = 0;
-let officialDepth = 0;
-
-function updateOfficialDepthCycling() {
-    if (!officialMat || !officialMesh) return;
-    const now = performance.now();
-    if (!officialLastTime) officialLastTime = now;
-    const delta = (now - officialLastTime) / 1000; // seconds
-    officialLastTime = now;
-    officialDepth += delta * 10.0; // pace similar to the official example
-    const layers = officialMat.uniforms.depthMax?.value || 5;
-    const value = Math.floor(officialDepth % layers);
-    officialMat.uniforms['depth'].value = value;
-}
-
-function loadOfficialArrayFromUrl(url) {
-    showLoadingSpinner();
-    // Hide the cube and remove previous plane if any
-    cube.visible = false;
-    if (officialMesh) {
-        try { scene.remove(officialMesh); officialMesh.geometry.dispose(); officialMesh.material.dispose(); } catch { }
-        officialMesh = null;
-        officialMat = null;
-    }
-
-    ktx2Loader.load(url, (texture) => {
-        texture.flipY = false;
-        texture.generateMipmaps = false;
-        const hasMips = Array.isArray(texture.mipmaps) ? texture.mipmaps.length > 1 : true;
-        texture.minFilter = hasMips ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
-                texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-            }
-        } catch { }
-
-        const depth = texture?.image?.depth || 1;
-        console.log('[Official-style] GPU-format:', formatToString(texture.format), `(${texture.format})`, 'layers=', depth, 'mips=', texture.mipmaps?.length ?? 'unknown');
-
-        const planeWidth = 5.0;
-        const planeHeight = 2.5;
-
-        const vs = /* glsl */`
-            uniform vec2 size;
-            out vec2 vUv;
-            void main() {
-                gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-                vUv.xy = position.xy / size + 0.5;
-                vUv.y = 1.0 - vUv.y; // original data is upside down
-            }
-        `;
-        const fs = /* glsl */`
-            precision highp float;
-            precision highp int;
-            precision highp sampler2DArray;
-            uniform sampler2DArray diffuse;
-            in vec2 vUv;
-            uniform int depth;
-            out vec4 outColor;
-            void main() {
-                vec4 color = texture( diffuse, vec3( vUv, depth ) );
-                outColor = vec4( color.rgb + .2, 1.0 );
-            }
-        `;
-
-        const mat = new THREE.ShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: {
-                diffuse: { value: texture },
-                depth: { value: 0 },
-                depthMax: { value: depth },
-                size: { value: new THREE.Vector2(planeWidth, planeHeight) },
-            },
-            vertexShader: vs,
-            fragmentShader: fs,
-        });
-        officialMat = mat;
-        officialDepth = 0;
-        officialLastTime = performance.now();
-
-        const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-        officialMesh = new THREE.Mesh(geometry, mat);
-        scene.add(officialMesh);
-
-        hideLoadingSpinner();
-    }, undefined, (error) => {
-        hideLoadingSpinner();
-        console.error('Error loading official-style KTX2 array:', error);
-    });
-}
