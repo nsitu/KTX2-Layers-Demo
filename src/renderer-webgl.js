@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
-import { showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+import { showLoadingSpinner, hideLoadingSpinner, isAndroid } from './utils.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -99,8 +99,7 @@ function getQueryParam(name) {
     try { return new URLSearchParams(window.location.search).get(name) || null; } catch { return null; }
 }
 try {
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-    const isAndroidUA = /Android/i.test(ua);
+    const isAndroidDevice = isAndroid();
     // Read GPU renderer string if available
     let rendererStr = 'unknown';
     try {
@@ -114,7 +113,7 @@ try {
     let policy = 'auto';
     if (force === 'astc') policy = 'force-astc';
     else if (force === 'etc2') policy = 'force-etc2';
-    else if (isAndroidUA && isMali) policy = 'android-mali-etc2';
+    else if (isAndroidDevice && isMali) policy = 'android-mali-etc2';
 
     if (policy === 'force-astc') {
         ktx2Loader.workerConfig = {
@@ -137,7 +136,7 @@ try {
             etc1Supported: true,
         };
     }
-    console.log('[KTX2 cfg] policy =', policy, '| Android =', isAndroidUA, '| renderer =', rendererStr);
+    console.log('[KTX2 cfg] policy =', policy, '| Android =', isAndroidDevice, '| renderer =', rendererStr);
 } catch { }
 
 // Default texture load removed for array demo focus
@@ -287,8 +286,7 @@ function loadKTX2ArrayFromBuffer(buffer, layers) {
         texture.wrapT = THREE.ClampToEdgeWrapping;
         // Avoid anisotropy on Android for stability
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
             }
         } catch { }
@@ -320,8 +318,7 @@ function loadKTX2ArrayFromUrl(url) {
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
             }
         } catch { }
@@ -505,8 +502,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
         // Mild anisotropy for better quality when minifying; 
         // avoid on Android to reduce driver variability
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texArray.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
             }
         } catch { }

@@ -69,6 +69,12 @@ const getOptimalThreadCount = () => {
 
 const optimalThreadCount = getOptimalThreadCount();
 
+// Android detection utility
+function isAndroid() {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    return /Android/i.test(ua);
+}
+
 // Loading spinner control functions
 function showLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
@@ -96,4 +102,4 @@ function hideLoadingSpinner() {
     }
 }
 
-export { threadingSupported, optimalThreadCount, showLoadingSpinner, hideLoadingSpinner, getWasmThreadingDiagnostics };
+export { threadingSupported, optimalThreadCount, isAndroid, showLoadingSpinner, hideLoadingSpinner, getWasmThreadingDiagnostics };

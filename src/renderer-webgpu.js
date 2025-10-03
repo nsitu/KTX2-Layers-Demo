@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
 
-import { showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+import { showLoadingSpinner, hideLoadingSpinner, isAndroid } from './utils.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -173,8 +173,7 @@ async function loadKTX2ArrayFromBuffer(buffer, layers) {
         texture.wrapT = THREE.ClampToEdgeWrapping;
 
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texture.anisotropy = Math.min(4, renderer.capabilities?.getMaxAnisotropy?.() || 4);
             }
         } catch { }
@@ -208,8 +207,7 @@ async function loadKTX2ArrayFromUrl(url) {
         texture.wrapT = THREE.ClampToEdgeWrapping;
 
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texture.anisotropy = Math.min(4, renderer.capabilities?.getMaxAnisotropy?.() || 4);
             }
         } catch { }
@@ -387,8 +385,7 @@ async function loadKTX2ArrayFromSlices(buffers) {
         texArray.wrapT = THREE.ClampToEdgeWrapping;
 
         try {
-            const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-            if (!/Android/i.test(ua)) {
+            if (!isAndroid()) {
                 texArray.anisotropy = Math.min(4, renderer.capabilities?.getMaxAnisotropy?.() || 4);
             }
         } catch { }

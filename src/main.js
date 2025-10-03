@@ -2,7 +2,7 @@ import './style.css';
 import { loadBasisModule } from './load_basis.js';
 import { ImageToKtx } from './image_to_ktx.js';
 import { ImagesToKtx } from './images_to_ktx.js';
-import { threadingSupported, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
+import { threadingSupported, isAndroid, showLoadingSpinner, hideLoadingSpinner } from './utils.js';
 
 // Pre-import both renderer modules to ensure Vite includes them in production build
 // We'll use dynamic imports to actually load them, but this ensures dependencies are bundled
@@ -16,8 +16,7 @@ let rendererType = 'webgl'; // default
 async function chooseRenderer() {
     const params = new URLSearchParams(window.location.search);
     const forceRenderer = (params.get('renderer') || '').toLowerCase();
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-    const isAndroid = /Android/i.test(ua);
+    const isAndroidDevice = isAndroid();
 
     // Check WebGPU availability
     const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
@@ -31,7 +30,7 @@ async function chooseRenderer() {
         rendererType = hasWebGPU ? 'webgpu' : 'webgl';
     }
 
-    console.log('[Renderer] chosen=', rendererType, '| hasWebGPU=', hasWebGPU, '| Android=', isAndroid, '| force=', forceRenderer || 'auto');
+    console.log('[Renderer] chosen=', rendererType, '| hasWebGPU=', hasWebGPU, '| Android=', isAndroidDevice, '| force=', forceRenderer || 'auto');
 
     // Use pre-imported modules (already loaded above for Vite bundling)
     if (rendererType === 'webgpu') {

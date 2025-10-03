@@ -3,8 +3,7 @@ import { threadingSupported, optimalThreadCount } from './utils.js';
 import { getBasisModule } from './load_basis.js';
 import { calculateKTX2BufferSize, getFileExtension } from './image-utils.js';
 
-// NOTE: Input images are now pre-processed to POT dimensions
-// by the image resizer worker before reaching this module
+// NOTE: Input images should have POT dimensions
 
 export const ImageToKtx = {
     encode: encodeImageToKtx,
@@ -26,7 +25,7 @@ let encodingSettings = {
 };
 
 // NOTE:  Zstandard supercompression is disabled for simplicity 
-// If you want to enable it you may need zstddec.js/wasm 
+// If you do want to enable it you might need additional zstddec.js/wasm 
 // on the display end, hosted alongside the transcoder for KTX2Loader.
 
 function configureEncoding(opts = {}) {

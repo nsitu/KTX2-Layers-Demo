@@ -3,7 +3,7 @@ import { getBasisModule } from './load_basis.js';
 import { calculateKTX2ArrayBufferSize, getFileExtension } from './image-utils.js';
 
 // Multi-image encoder: encodes N input images (identical dimensions) as a KTX2 2D texture array
-// Mirrors the single-image implementation in img_to_ktx.js but sets multiple slices.
+// Mirrors the single-image implementation in image_to_ktx.js but sets multiple slices.
 
 export const ImagesToKtx = {
     encode: encodeImagesToKtxArray,
