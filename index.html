@@ -13,6 +13,11 @@
     content="width=device-width, initial-scale=1.0"
   />
   <title>Vite App</title>
+
+  <!-- Cross-Origin Isolation Service Worker -->
+  <script src="./coi-serviceworker.js"></script>
+
+
   <script src="./eruda/eruda.js"></script>
   <script>
     // Check for eruda query parameter
@@ -22,8 +27,6 @@
     }
   </script>
 
-  <!-- Cross-Origin Isolation Service Worker -->
-  <script src="./coi-serviceworker.js"></script>
 </head>
 
 <body>

@@ -129,5 +129,6 @@ try {
     await loadBasisModule();
     await runArrayDemo();
 } catch (error) {
-    console.error('Failed to initialize application:', error);
+    console.error('Failed to initialize application');
+    console.error(error)
 }
