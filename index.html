@@ -14,7 +14,13 @@
   />
   <title>Vite App</title>
   <script src="./eruda/eruda.js"></script>
-  <script>eruda.init();</script>
+  <script>
+    // Check for eruda query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('eruda')) {
+      eruda.init();
+    }
+  </script>
 
   <!-- Cross-Origin Isolation Service Worker -->
   <script src="./coi-serviceworker.js"></script>
